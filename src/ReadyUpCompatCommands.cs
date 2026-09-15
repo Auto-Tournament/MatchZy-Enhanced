@@ -196,18 +196,10 @@ namespace MatchZy
             if (isMatchSetup)
             {
                 string currentStatus = tournamentStatus.Value ?? string.Empty;
-                if (string.Equals(currentStatus, "postgame", StringComparison.OrdinalIgnoreCase))
+                if (CanQueueMatchLoad(currentStatus))
                 {
-                    queuedMatchUrl = url;
-                    queuedMatchHeaderName = "Authorization";
-                    queuedMatchHeaderValue = string.IsNullOrWhiteSpace(matchToken) ? "" : $"Bearer {matchToken}";
-                    isMatchQueued = true;
-
-                    // Surface state to allocator/UI.
-                    UpdateTournamentStatus("queued");
-                    tournamentNextMatch.Value = DeriveIdentifierFromUrlOrPath(url) ?? url;
-
-                    Log($"[matchzy match load] Current match {liveMatchId} is postgame. Queued next match from URL: {url}");
+                    string authHeaderValue = string.IsNullOrWhiteSpace(matchToken) ? "" : $"Bearer {matchToken}";
+                    QueueMatchLoad(null, "matchzy match load", url, authHeaderValue == "" ? "" : "Authorization", authHeaderValue);
                 }
                 else
                 {

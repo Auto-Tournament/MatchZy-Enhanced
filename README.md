@@ -47,6 +47,15 @@ Built for **[MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-
 - 📊 **Server tracking** with health monitoring and status events
 - 💾 **Pull API** for direct match stats retrieval
 
+### Queued match loads
+
+`matchzy_loadmatch_url` (and `matchzy match load`) sent while the current series is in postgame does not load right away. The match is queued and loads after the series resets. The reply ends with `queued_match=<id>`, where `<id>` is the config file name without its extension (for `/api/matches/r2m1.json` that is `r2m1`), and the `matchzy_tournament_next_match` convar holds the same id. Sending another URL while one is queued replaces it.
+
+The queued match is loaded only by the automatic reset after a series ends. It is dropped when:
+
+- `css_restart` or `css_endmatch` resets the server. The reply includes `cleared_queued_match=<id>`.
+- `matchzy_clear_queued_match` is run. This is server console / RCON only. The reply is `cleared_queued_match=<id>`, or `cleared_queued_match=none` when nothing was queued.
+
 ### Player Features
 - 🚀 **Auto-ready system** — Instant match starts (optional)
 - ⏸️ **Enhanced pauses** — Team limits, timeouts, dual unpause

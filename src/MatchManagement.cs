@@ -23,6 +23,7 @@ namespace MatchZy
         private string? queuedMatchUrl;
         private string? queuedMatchHeaderName;
         private string? queuedMatchHeaderValue;
+        private string? queuedMatchIdentifier;
 
         public bool matchModeOnly = false;
 
@@ -111,39 +112,9 @@ namespace MatchZy
             if (isMatchSetup)
             {
                 string currentStatus = tournamentStatus.Value ?? string.Empty;
-                if (string.Equals(currentStatus, "postgame", StringComparison.OrdinalIgnoreCase))
+                if (CanQueueMatchLoad(currentStatus))
                 {
-                    // Heuristically derive a slug/identifier for the queued match from the URL, if possible.
-                    string nextMatchIdentifier = url;
-                    try
-                    {
-                        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-                        {
-                            var path = uri.AbsolutePath.TrimEnd('/');
-                            var lastSegment = path.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
-                            if (!string.IsNullOrEmpty(lastSegment))
-                            {
-                                nextMatchIdentifier = System.IO.Path.GetFileNameWithoutExtension(lastSegment);
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // Fallback: keep the raw URL as identifier.
-                        nextMatchIdentifier = url;
-                    }
-
-                    queuedMatchUrl = url;
-                    queuedMatchHeaderName = headerName;
-                    queuedMatchHeaderValue = headerValue;
-                    isMatchQueued = true;
-
-                    Log($"[LoadMatchDataCommand] Current match {liveMatchId} is in postgame. Queuing next match from URL: {url} to load after reset.");
-                    ReplyToUserCommand(player, $"[LoadMatchDataCommand] Current match {liveMatchId} is finishing. Queued next match from URL: {url} to load after reset.");
-
-                    // Surface this state to the allocator / UI so it knows a new match is lined up.
-                    UpdateTournamentStatus("queued");
-                    tournamentNextMatch.Value = nextMatchIdentifier;
+                    QueueMatchLoad(player, "LoadMatchDataCommand", url, headerName, headerValue);
                 }
                 else
                 {
@@ -204,8 +175,94 @@ namespace MatchZy
         }
 
         /// <summary>
+        /// A load request can be queued while the current series is in postgame, or
+        /// replace an already queued one.
+        /// </summary>
+        private static bool CanQueueMatchLoad(string currentStatus)
+        {
+            return string.Equals(currentStatus, "postgame", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(currentStatus, "queued", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Queues a match config URL to load once the current series has been reset.
+        /// The reply carries "queued_match=&lt;identifier&gt;" (the config file name
+        /// without extension, e.g. r2m1) so the caller can tell from the RCON reply that
+        /// the load was queued rather than executed.
+        /// </summary>
+        private void QueueMatchLoad(CCSPlayerController? player, string source, string url, string? headerName, string? headerValue)
+        {
+            string identifier = DeriveIdentifierFromUrlOrPath(url) ?? url;
+            string? replaced = isMatchQueued ? queuedMatchIdentifier : null;
+
+            queuedMatchUrl = url;
+            queuedMatchHeaderName = headerName;
+            queuedMatchHeaderValue = headerValue;
+            queuedMatchIdentifier = identifier;
+            isMatchQueued = true;
+
+            // Surface this state to the allocator / UI so it knows a new match is lined up.
+            UpdateTournamentStatus("queued");
+            tournamentNextMatch.Value = identifier;
+
+            string replacedText = replaced != null ? $" (replaced queued match {replaced})" : "";
+            string message = $"[{source}] Current match {liveMatchId} is finishing. Queued next match {identifier} from URL: {url} to load after reset{replacedText}. queued_match={identifier}";
+            Log(message);
+            ReplyToUserCommand(player, message);
+        }
+
+        /// <summary>
+        /// Drops a queued match load, if any. Returns the identifier of the dropped match.
+        /// </summary>
+        private string? ClearQueuedMatch(string reason)
+        {
+            if (!isMatchQueued)
+            {
+                return null;
+            }
+
+            string? identifier = queuedMatchIdentifier;
+            isMatchQueued = false;
+            queuedMatchUrl = null;
+            queuedMatchHeaderName = null;
+            queuedMatchHeaderValue = null;
+            queuedMatchIdentifier = null;
+            tournamentNextMatch.Value = "";
+
+            // The current series is still finishing; step back from "queued" so the
+            // allocator does not wait for a load that will no longer happen.
+            if (isMatchSetup && string.Equals(tournamentStatus.Value, "queued", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateTournamentStatus("postgame");
+            }
+
+            Log($"[MatchQueue] Cleared queued match {identifier ?? "unknown"} ({reason}).");
+            return identifier;
+        }
+
+        [ConsoleCommand("matchzy_clear_queued_match", "Clears a match queued by matchzy_loadmatch_url during postgame so it is not loaded after reset")]
+        public void ClearQueuedMatchCommand(CCSPlayerController? player, CommandInfo command)
+        {
+            if (player != null) return;
+
+            string? cleared = ClearQueuedMatch("matchzy_clear_queued_match");
+            if (cleared == null)
+            {
+                ReplyToUserCommand(player, "[MatchQueue] No queued match to clear. cleared_queued_match=none");
+                return;
+            }
+            ReplyClearedQueuedMatch(player, cleared);
+        }
+
+        private void ReplyClearedQueuedMatch(CCSPlayerController? player, string? cleared)
+        {
+            if (cleared == null) return;
+            ReplyToUserCommand(player, $"[MatchQueue] Cleared queued match {cleared}; it will not be loaded. cleared_queued_match={cleared}");
+        }
+
+        /// <summary>
         /// If a match was queued while the previous series was still active (postgame),
-        /// load it now that ResetMatch() has completed and the server is idle again.
+        /// load it now that the series has been reset after it ended normally.
         /// </summary>
         private void TryLoadQueuedMatchAfterReset()
         {
@@ -217,15 +274,17 @@ namespace MatchZy
             string url = queuedMatchUrl!;
             string? headerName = queuedMatchHeaderName;
             string? headerValue = queuedMatchHeaderValue;
+            string? identifier = queuedMatchIdentifier;
 
             // Clear the queue state up-front so we don't accidentally loop if something fails.
             isMatchQueued = false;
             queuedMatchUrl = null;
             queuedMatchHeaderName = null;
             queuedMatchHeaderValue = null;
+            queuedMatchIdentifier = null;
             tournamentNextMatch.Value = "";
 
-            Log($"[MatchQueue] Attempting to auto-load queued match from URL after reset: {url}");
+            Log($"[MatchQueue] Attempting to auto-load queued match {identifier} from URL after reset: {url}");
 
             try
             {
@@ -711,11 +770,14 @@ namespace MatchZy
                     float ts = jsonDataObject["simulation_timescale"]!.Value<float>();
                     if (float.IsNaN(ts) || float.IsInfinity(ts)) throw new Exception("NaN/Inf");
 
-                    // Clamp between 0.1x and 4x to avoid crazy values.
-                    if (ts < 0.1f) ts = 0.1f;
-                    if (ts > 4.0f) ts = 4.0f;
+                    // Clamp between 0.1x and 10x (the range MAT allows) to avoid crazy values.
+                    float clamped = MatchLogic.ClampSimulationTimeScale(ts);
+                    if (clamped != ts)
+                    {
+                        Log($"[LOADMATCH] simulation_timescale {ts} is outside {MatchLogic.MinSimulationTimeScale}-{MatchLogic.MaxSimulationTimeScale}; using {clamped}.");
+                    }
 
-                    matchConfig.SimulationTimeScale = ts;
+                    matchConfig.SimulationTimeScale = clamped;
                 }
                 catch (Exception)
                 {
@@ -940,6 +1002,21 @@ namespace MatchZy
             long matchId = liveMatchId;
             (int team1Score, int team2Score) = (matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
             Log($"[SeriesCheckpoint] SERIES END reached for match {matchId}. Final map score: {matchzyTeam1.teamName} {t1score} – {matchzyTeam2.teamName} {t2score}. Final series score: {matchzyTeam1.teamName} {team1Score} – {matchzyTeam2.teamName} {team2Score}.");
+
+            // The series winner is decided by the series score alone. Callers pass the
+            // winner of the *last map*, which is not the series winner when a series is
+            // played out (e.g. 2-1 where the loser took the final map) and is "Draw"
+            // for a drawn final map.
+            string winnerTeam = MatchLogic.ResolveMapWinnerSlot(team1Score, team2Score, null);
+            string? seriesWinnerName = winnerTeam == MatchLogic.Team1 ? matchzyTeam1.teamName
+                : winnerTeam == MatchLogic.Team2 ? matchzyTeam2.teamName
+                : null;
+            if (seriesWinnerName != winnerName)
+            {
+                Log($"[SeriesCheckpoint] Last map winner '{winnerName ?? "none"}' differs from series winner '{seriesWinnerName ?? "none"}'; using the series winner.");
+            }
+            winnerName = seriesWinnerName;
+
             if (winnerName == null)
             {
                 PrintToAllChat($"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} and {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} have tied the match");
@@ -949,12 +1026,11 @@ namespace MatchZy
                 Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{winnerName}{ChatColors.Default} has won the match");
             }
 
-            string winnerTeam = (winnerName == null) ? "none" : matchzyTeam1.seriesScore > matchzyTeam2.seriesScore ? "team1" : "team2";
-
             var seriesResultEvent = new MatchZySeriesResultEvent()
             {
                 MatchId = matchId,
-                Winner = new Winner(t1score > t2score && reverseTeamSides["CT"] == matchzyTeam1 ? "3" : "2", winnerTeam),
+                // Side is the side the series winner finished the last map on ("0" for a draw).
+                Winner = new Winner(MatchLogic.SideNumberForSlot(winnerTeam, teamSides[matchzyTeam1]), winnerTeam),
                 Team1SeriesScore = team1Score,
                 Team2SeriesScore = team2Score,
                 TimeUntilRestore = 10,
@@ -1074,7 +1150,7 @@ namespace MatchZy
                 // Reset match after a short delay to ensure kicks are processed
                 AddTimer(2.0f, () =>
                 {
-                    ResetMatch(false);
+                    ResetMatch(false, loadQueuedMatch: true);
                 });
             });
         }

@@ -574,6 +574,7 @@ namespace MatchZy
                 {
                     // Server.PrintToChatAll($"{chatPrefix} An admin force-ended the match.");
                     PrintToAllChat(Localizer["matchzy.cc.endmatch"]);
+                    ReplyClearedQueuedMatch(player, ClearQueuedMatch("css_endmatch"));
                     ResetMatch();
                 }
                 else
@@ -596,6 +597,7 @@ namespace MatchZy
             {
                 if (!isPractice)
                 {
+                    ReplyClearedQueuedMatch(player, ClearQueuedMatch("css_restart"));
                     ResetMatch();
                 }
                 else
