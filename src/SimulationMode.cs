@@ -74,7 +74,7 @@ public partial class MatchZy
     /// Assigns a configured simulation identity to the given bot, if available.
     /// Called from the player connect handler when a bot joins in simulation mode.
     /// </summary>
-    private SimulationPlayerIdentity? AssignSimulationIdentityForBot(CCSPlayerController player)
+    private SimulationPlayerIdentity? AssignSimulationIdentityForBot(CCSPlayerController player, bool allowUnassignedTeam = false)
     {
         if (!isSimulationMode || !player.IsBot || !player.UserId.HasValue)
         {
@@ -87,20 +87,59 @@ public partial class MatchZy
             return existing;
         }
 
+        // The identity must belong to the team slot currently playing on the bot's side.
+        // Bots are requested per side (team1's side first), but the engine does not hand
+        // them back in join order: EnsureSimulationBotsMappedAndAnnounced walks controllers
+        // newest-first, so assigning from the pool in order put team1's identities on the
+        // bots of team2's side. Every player-stat payload (round_end team1/team2 players)
+        // then listed the other team's names.
+        string team1Side = teamSides.TryGetValue(matchzyTeam1, out var side1) ? side1 : "CT";
+        string? botSlot = MatchLogic.SlotForTeamNum(player.TeamNum, team1Side);
+        if (botSlot == null && !allowUnassignedTeam)
+        {
+            // Not on CT/T yet (e.g. connect-full fires before the team join). The follow-up
+            // mapping pass assigns it once the bot has a side.
+            Log($"[SimulationMode] Bot {player.PlayerName} (UserId {userId}) has no side yet (TeamNum={player.TeamNum}); deferring identity assignment.");
+            return null;
+        }
+
+        SimulationPlayerIdentity? candidate = null;
         foreach (var identity in simulationIdentityPool)
         {
-            if (!assignedSimulationSteamIds.Contains(identity.ConfigSteamId))
+            if (assignedSimulationSteamIds.Contains(identity.ConfigSteamId)) continue;
+            if (botSlot == null || identity.TeamSlot == botSlot)
             {
-                assignedSimulationSteamIds.Add(identity.ConfigSteamId);
-                simulationPlayersByUserId[userId] = identity;
-                Log($"[SimulationMode] Assigned bot {player.PlayerName} (UserId {userId}) to simulated player {identity.ConfigName} ({identity.ConfigSteamId}) on {identity.TeamSlot}");
-                // Now that we have at least one mapped simulation player, ensure the
-                // simulated ready flow is scheduled. This avoids starting the ready
-                // flow too early (before bots have connected) and falling back to a
-                // team-level auto-ready with zero players.
-                ScheduleSimulationReadyFlowIfNeeded();
-                return identity;
+                candidate = identity;
+                break;
             }
+        }
+
+        if (candidate == null && botSlot != null)
+        {
+            // More bots on this side than configured players for the team. Fall back to any
+            // free identity rather than leaving the bot unmapped, and say so.
+            foreach (var identity in simulationIdentityPool)
+            {
+                if (!assignedSimulationSteamIds.Contains(identity.ConfigSteamId))
+                {
+                    candidate = identity;
+                    Log($"[SimulationMode] Warning: no free {botSlot} identity for bot {player.PlayerName} (UserId {userId}, TeamNum={player.TeamNum}); using {identity.TeamSlot} identity {identity.ConfigName}.");
+                    break;
+                }
+            }
+        }
+
+        if (candidate != null)
+        {
+            assignedSimulationSteamIds.Add(candidate.ConfigSteamId);
+            simulationPlayersByUserId[userId] = candidate;
+            Log($"[SimulationMode] Assigned bot {player.PlayerName} (UserId {userId}, TeamNum={player.TeamNum}) to simulated player {candidate.ConfigName} ({candidate.ConfigSteamId}) on {candidate.TeamSlot}");
+            // Now that we have at least one mapped simulation player, ensure the
+            // simulated ready flow is scheduled. This avoids starting the ready
+            // flow too early (before bots have connected) and falling back to a
+            // team-level auto-ready with zero players.
+            ScheduleSimulationReadyFlowIfNeeded();
+            return candidate;
         }
 
         Log($"[SimulationMode] No available simulated player identity for bot {player.PlayerName} (UserId {userId})");
@@ -266,7 +305,9 @@ public partial class MatchZy
             SimulationPlayerIdentity? identity;
             if (!simulationPlayersByUserId.TryGetValue(userId, out identity))
             {
-                identity = AssignSimulationIdentityForBot(bot);
+                // Last mapping pass: a bot still without a side gets any free identity
+                // rather than staying unmapped.
+                identity = AssignSimulationIdentityForBot(bot, allowUnassignedTeam: true);
             }
 
             if (identity == null)
@@ -483,9 +524,7 @@ public partial class MatchZy
         float ts = 1.0f;
         if (matchConfig != null)
         {
-            ts = matchConfig.SimulationTimeScale;
-            if (ts < 0.1f) ts = 0.1f;
-            if (ts > 4.0f) ts = 4.0f;
+            ts = MatchLogic.ClampSimulationTimeScale(matchConfig.SimulationTimeScale);
         }
 
         Log($"[SimulationMode] Enforcing sv_cheats 1 and host_timescale {ts:0.##} for simulation.");

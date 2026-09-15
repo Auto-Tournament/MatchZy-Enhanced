@@ -30,3 +30,8 @@ jobs:
       # would mean landing a red build. Worth revisiting once the tree is clean.
       - name: Build
         run: dotnet build -c Release --no-restore --nologo
+
+      # Unit tests cover the dependency-free match rules in src/MatchLogic.cs
+      # (map/round winner resolution, side<->team mapping, timescale clamp).
+      - name: Test
+        run: dotnet test tests/MatchZy.Tests -c Release --nologo

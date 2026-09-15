@@ -1234,8 +1234,20 @@ namespace MatchZy
             return (count, totalHealth);
         }
 
-        private void ResetMatch(bool warmupCfgRequired = true)
+        /// <param name="loadQueuedMatch">
+        /// True only for the automatic reset after a series ended normally: a match queued
+        /// during postgame is then loaded. Every other reset (css_restart, css_endmatch,
+        /// load failures, leaving practice) is an operator or error reset, and loading a
+        /// match queued before it would resurrect an allocation the caller may already
+        /// have moved elsewhere, so the queue is dropped.
+        /// </param>
+        private void ResetMatch(bool warmupCfgRequired = true, bool loadQueuedMatch = false)
         {
+            if (!loadQueuedMatch)
+            {
+                ClearQueuedMatch("match reset");
+            }
+
             try
             {
                 // We stop demo recording if a live match was restarted
@@ -2204,7 +2216,7 @@ namespace MatchZy
                 StopDemoRecording(tvFlushDelay - 0.5f, activeDemoFile, liveMatchId, currentMapNumber);
             }
 
-            string winnerName = GetMatchWinnerName();
+            (string winnerName, string winnerSlot) = GetMatchWinner();
             (int t1score, int t2score) = GetTeamsScore();
             int team1SeriesScore = matchzyTeam1.seriesScore;
             int team2SeriesScore = matchzyTeam2.seriesScore;
@@ -2223,7 +2235,10 @@ namespace MatchZy
             {
                 MatchId = liveMatchId,
                 MapNumber = currentMapNumber,
-                Winner = new Winner(t1score > t2score && reverseTeamSides["CT"] == matchzyTeam1 ? "3" : "2", t1score > t2score ? "team1" : "team2"),
+                // Winner comes from the resolved map winner (score, then damage tiebreak),
+                // never from a raw score comparison: a tied map used to fall through to
+                // "team2" even when the tiebreak had picked team1.
+                Winner = new Winner(MatchLogic.SideNumberForSlot(winnerSlot, teamSides[matchzyTeam1]), winnerSlot),
                 StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, team1SeriesScore, t1score, 0, 0, new List<StatsPlayer>()),
                 StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, team2SeriesScore, t2score, 0, 0, new List<StatsPlayer>())
             };
@@ -2471,18 +2486,18 @@ namespace MatchZy
             });
         }
 
-        private string GetMatchWinnerName()
+        /// <summary>
+        /// Resolves the winner of the map that just ended and credits the series
+        /// point. Returns the winner's team name ("Draw" when nobody won) and slot
+        /// ("team1" / "team2" / "none"). Every event and DB write about this map
+        /// must use this result so they agree with each other.
+        /// </summary>
+        private (string winnerName, string winnerSlot) GetMatchWinner()
         {
             (int t1score, int t2score) = GetTeamsScore();
-            if (t1score > t2score)
+            if (t1score != t2score)
             {
-                matchzyTeam1.seriesScore++;
-                return matchzyTeam1.teamName;
-            }
-            else if (t2score > t1score)
-            {
-                matchzyTeam2.seriesScore++;
-                return matchzyTeam2.teamName;
+                return CreditMapWinner(MatchLogic.ResolveMapWinnerSlot(t1score, t2score, null));
             }
 
             // At this point the map is tied on score. Depending on the configured
@@ -2519,29 +2534,37 @@ namespace MatchZy
 
             if (performanceTiebreakRequested)
             {
-                string? tiebreakWinner = GetPerformanceTiebreakWinner();
-                if (!string.IsNullOrEmpty(tiebreakWinner))
+                string? tiebreakSlot = GetPerformanceTiebreakWinnerSlot();
+                if (tiebreakSlot != null)
                 {
-                    if (tiebreakWinner == matchzyTeam1.teamName)
-                    {
-                        matchzyTeam1.seriesScore++;
-                    }
-                    else if (tiebreakWinner == matchzyTeam2.teamName)
-                    {
-                        matchzyTeam2.seriesScore++;
-                    }
+                    (string tiebreakName, string slot) = CreditMapWinner(MatchLogic.ResolveMapWinnerSlot(t1score, t2score, tiebreakSlot));
 
                     Log($"[Tiebreak] Map ended tied on score (team1={t1score}, team2={t2score}). " +
-                        $"Overtime disabled with overtimeSegments=0, selecting '{tiebreakWinner}' as winner based on performance metrics.");
+                        $"Overtime disabled with overtimeSegments=0, selecting '{tiebreakName}' ({slot}) as winner based on performance metrics.");
 
-                    return tiebreakWinner;
+                    return (tiebreakName, slot);
                 }
 
                 Log($"[Tiebreak] Map ended tied on score and performance metrics were also tied; " +
                     $"falling back to a recorded draw.");
             }
 
-            return "Draw";
+            return ("Draw", MatchLogic.NoTeam);
+        }
+
+        private (string winnerName, string winnerSlot) CreditMapWinner(string slot)
+        {
+            if (slot == MatchLogic.Team1)
+            {
+                matchzyTeam1.seriesScore++;
+                return (matchzyTeam1.teamName, slot);
+            }
+            if (slot == MatchLogic.Team2)
+            {
+                matchzyTeam2.seriesScore++;
+                return (matchzyTeam2.teamName, slot);
+            }
+            return ("Draw", MatchLogic.NoTeam);
         }
 
         /// <summary>
@@ -2551,8 +2574,8 @@ namespace MatchZy
         /// higher total. If both teams have identical Damage, this returns null and
         /// the caller should treat the result as a true draw.
         /// </summary>
-        /// <returns>The winning team name, or null if still tied.</returns>
-        private string? GetPerformanceTiebreakWinner()
+        /// <returns>The winning team slot ("team1"/"team2"), or null if still tied.</returns>
+        private string? GetPerformanceTiebreakWinnerSlot()
         {
             try
             {
@@ -2589,19 +2612,9 @@ namespace MatchZy
 
                 Log($"[Tiebreak] Aggregate damage totals - {matchzyTeam1.teamName}: {team1DamageTotal}, {matchzyTeam2.teamName}: {team2DamageTotal}");
 
-                if (team1DamageTotal > team2DamageTotal)
-                {
-                    return matchzyTeam1.teamName;
-                }
-
-                if (team2DamageTotal > team1DamageTotal)
-                {
-                    return matchzyTeam2.teamName;
-                }
-
-                // Perfect tie on damage as well – extremely unlikely, but in this case
-                // we deliberately do NOT pick an arbitrary winner.
-                return null;
+                // A perfect tie on damage as well returns null – extremely unlikely, but
+                // in this case we deliberately do NOT pick an arbitrary winner.
+                return MatchLogic.ResolveDamageTiebreakSlot(team1DamageTotal, team2DamageTotal);
             }
             catch (Exception ex)
             {
@@ -2691,9 +2704,10 @@ namespace MatchZy
 
                     int currentMapNumber = matchConfig.CurrentMapNumber;
                     long matchId = liveMatchId;
-                    int ctTeamNum = reverseTeamSides["CT"] == matchzyTeam1 ? 1 : 2;
-                    int tTeamNum = reverseTeamSides["TERRORIST"] == matchzyTeam1 ? 1 : 2;
-                    Winner winner = new(@event.Winner.ToString(), t1score > t2score ? "team1" : "team2");
+                    // The round winner is whichever team is on the winning side this round
+                    // (sides swap after this event is built), not whoever leads the map.
+                    string roundWinnerSlot = MatchLogic.SlotForTeamNum(@event.Winner, teamSides[matchzyTeam1]) ?? MatchLogic.NoTeam;
+                    Winner winner = new(@event.Winner.ToString(), roundWinnerSlot);
 
                     var roundEndEvent = new MatchZyRoundEndedEvent
                     {
@@ -2703,8 +2717,8 @@ namespace MatchZy
                         Reason = @event.Reason,
                         RoundTime = 0,
                         Winner = winner,
-                        StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, 0, t1score, 0, 0, playerStatsListTeam1),
-                        StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, 0, t2score, 0, 0, playerStatsListTeam2),
+                        StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, matchzyTeam1.seriesScore, t1score, 0, 0, playerStatsListTeam1),
+                        StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, matchzyTeam2.seriesScore, t2score, 0, 0, playerStatsListTeam2),
                     };
 
                     Task.Run(async () =>
