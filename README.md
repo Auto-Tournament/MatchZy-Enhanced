@@ -56,6 +56,26 @@ The queued match is loaded only by the automatic reset after a series ends. It i
 - `css_restart` or `css_endmatch` resets the server. The reply includes `cleared_queued_match=<id>`.
 - `matchzy_clear_queued_match` is run. This is server console / RCON only. The reply is `cleared_queued_match=<id>`, or `cleared_queued_match=none` when nothing was queued.
 
+### Bootstrap config
+
+A controller such as MatchZy Auto Tournament points a server at its bootstrap endpoint with two
+server console / RCON commands:
+
+```
+matchzy_bootstrap_token "<token>"
+matchzy_bootstrap_url "http://<controller>/api/servers/<server_id>/bootstrap"
+```
+
+The plugin then fetches that URL (token sent as `X-MatchZy-Token`) and runs the commands in the
+payload. It fetches **about 1.5 seconds after the last change** to either value, not the moment
+one of them is set: every change restarts the timer, and the fetch uses the URL and token current
+when it fires. The two commands can be sent in either order and result in one fetch. On startup
+the persisted URL and token are fetched straight away.
+
+If the payload sets a `matchzy_server_id` that differs from the id in the bootstrap URL, or from
+the id the server already had, a `[Bootstrap] WARNING` is logged. The payload is still applied.
+This usually means the bootstrap URL is stale.
+
 ### Multi-server setups sharing one database
 
 Several servers can point at the same MySQL database. That is the point of a shared stats
