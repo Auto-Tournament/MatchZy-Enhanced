@@ -210,7 +210,7 @@ namespace MatchZy
 
             if (!IsValidUrl(url))
             {
-                Log($"[matchzy match load] Invalid URL: {url}");
+                Log($"[matchzy match load] Invalid URL: {SecretRedactor.RedactText(url)}");
                 UpdateTournamentStatus("error");
                 return;
             }
@@ -218,7 +218,7 @@ namespace MatchZy
             string token = string.IsNullOrWhiteSpace(matchToken) ? "" : matchToken.Trim();
             string authHeader = string.IsNullOrWhiteSpace(token) ? "" : $"Bearer {token}";
 
-            Log($"[matchzy match load] Fetching match config from {url} (auth={(string.IsNullOrWhiteSpace(authHeader) ? "none" : "bearer")})");
+            Log($"[matchzy match load] Fetching match config from {SecretRedactor.RedactText(url)} (auth={(string.IsNullOrWhiteSpace(authHeader) ? "none" : "bearer")})");
 
             Task.Run(async () =>
             {
@@ -235,7 +235,7 @@ namespace MatchZy
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        Log($"[matchzy match load] HTTP fetch failed ({(int)response.StatusCode}): {jsonData}");
+                        Log($"[matchzy match load] HTTP fetch failed ({(int)response.StatusCode}): {SecretRedactor.RedactText(jsonData)}");
                         Server.NextFrame(() =>
                         {
                             UpdateTournamentStatus("error");

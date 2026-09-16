@@ -17,7 +17,7 @@ namespace MatchZy
 
             if (!IsValidUrl(url))
             {
-                Log($"[RemoteLogURLCommand] Invalid URL: {url}. Please provide a valid URL!");
+                Log($"[RemoteLogURLCommand] Invalid URL: {SecretRedactor.RedactText(url)}. Please provide a valid URL!");
                 return;
             }
 
@@ -31,7 +31,7 @@ namespace MatchZy
             
             // Persist to database so it survives server restarts
             database.SaveConfigValue("matchzy_remote_log_url", url);
-            Log($"[RemoteLogURLCommand] Remote log URL set and persisted to database: {url}");
+            Log($"[RemoteLogURLCommand] Remote log URL set and persisted to database: {SecretRedactor.RedactText(url)}");
             
             // If URL changed, clear old failed events that were queued with the previous URL
             // This prevents retrying events to the wrong endpoint

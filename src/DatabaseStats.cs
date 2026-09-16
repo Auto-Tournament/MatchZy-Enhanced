@@ -778,7 +778,7 @@ namespace MatchZy
                 {
                     connection.Close();
                 }
-                Log($"[SaveConfigValue] Saved config for server '{ServerScope}': {key} = {value}");
+                Log($"[SaveConfigValue] Saved config for server '{ServerScope}': {key} = {SecretRedactor.FormatValue(key, value)}");
             }
             catch (Exception ex)
             {

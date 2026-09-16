@@ -32,7 +32,7 @@ namespace MatchZy
                 // Send immediately, then every 15 seconds.
                 SendMatHeartbeatSnapshot("startup", force: true);
                 heartbeatTimer = AddTimer(15.0f, () => { SendMatHeartbeatSnapshot("timer"); }, TimerFlags.REPEAT);
-                Log($"[MAT_HEARTBEAT] Started heartbeat timer (url={heartbeatUrl})");
+                Log($"[MAT_HEARTBEAT] Started heartbeat timer (url={SecretRedactor.RedactText(heartbeatUrl)})");
             }
             catch (Exception ex)
             {
@@ -128,7 +128,7 @@ namespace MatchZy
                     if (!response.IsSuccessStatusCode)
                     {
                         var respBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        Log($"[MAT_HEARTBEAT] POST failed ({(int)response.StatusCode}) status={statusRaw} matchid={matchId} url={hbUrl} resp={respBody}");
+                        Log($"[MAT_HEARTBEAT] POST failed ({(int)response.StatusCode}) status={statusRaw} matchid={matchId} url={SecretRedactor.RedactText(hbUrl)} resp={SecretRedactor.RedactText(respBody)}");
                         OnMatHeartbeatFailure();
                         return;
                     }

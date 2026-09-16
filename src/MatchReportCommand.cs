@@ -540,7 +540,7 @@ public partial class MatchZy : BasePlugin
                     return true;
                 }
 
-                Log($"[MatchReport] Upload failed (attempt {attempt}) StatusCode: {(int)response.StatusCode}, Content: {responseBody}");
+                Log($"[MatchReport] Upload failed (attempt {attempt}) StatusCode: {(int)response.StatusCode}, Content: {SecretRedactor.RedactText(responseBody)}");
             }
             catch (Exception ex)
             {

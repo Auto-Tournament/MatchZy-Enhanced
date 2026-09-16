@@ -125,7 +125,7 @@ namespace MatchZy
                 return;
             }
 
-            Log($"[LoadMatchDataCommand] Match setup request received with URL: {url} headerName: {headerName} and headerValue: {headerValue}");
+            Log($"[LoadMatchDataCommand] Match setup request received with URL: {SecretRedactor.RedactText(url)} header: {SecretRedactor.FormatCustomHeader(headerName, headerValue)}");
 
             if (!IsValidUrl(url))
             {
@@ -146,7 +146,7 @@ namespace MatchZy
                 if (response.IsSuccessStatusCode)
                 {
                     string jsonData = response.Content.ReadAsStringAsync().Result;
-                    Log($"[LoadMatchFromURL] Received following data: {jsonData}");
+                    Log($"[LoadMatchFromURL] Received following data: {SecretRedactor.RedactText(jsonData)}");
 
                     bool success = LoadMatchFromJSON(jsonData);
                     if (!success)
@@ -299,7 +299,7 @@ namespace MatchZy
                 if (response.IsSuccessStatusCode)
                 {
                     string jsonData = response.Content.ReadAsStringAsync().Result;
-                    Log($"[LoadQueuedMatch] Received following data for queued match: {jsonData}");
+                    Log($"[LoadQueuedMatch] Received following data for queued match: {SecretRedactor.RedactText(jsonData)}");
 
                     bool success = LoadMatchFromJSON(jsonData);
                     if (!success)
