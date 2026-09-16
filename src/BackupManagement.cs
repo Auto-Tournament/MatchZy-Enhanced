@@ -591,7 +591,7 @@ namespace MatchZy
             string headerName = command.ArgCount > 3 ? command.ArgByIndex(2) : "";
             string headerValue = command.ArgCount > 3 ? command.ArgByIndex(3) : "";
 
-            Log($"[LoadBackupFromURL] Backup Restore request received with URL: {url} headerName: {headerName} and headerValue: {headerValue}");
+            Log($"[LoadBackupFromURL] Backup Restore request received with URL: {SecretRedactor.RedactText(url)} header: {SecretRedactor.FormatCustomHeader(headerName, headerValue)}");
 
             if (!IsValidUrl(url))
             {
@@ -611,7 +611,7 @@ namespace MatchZy
                 if (response.IsSuccessStatusCode)
                 {
                     string jsonData = response.Content.ReadAsStringAsync().Result;
-                    Log($"[LoadBackupFromURL] Received following data: {jsonData}");
+                    Log($"[LoadBackupFromURL] Received following data: {SecretRedactor.RedactText(jsonData)}");
                     string fileName = Guid.NewGuid().ToString() + ".json";
                     string filePath = Path.Combine(Server.GameDirectory, "csgo", "MatchZyDataBackup", fileName);
 

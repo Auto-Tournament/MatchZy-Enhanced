@@ -15,6 +15,7 @@
     <Compile Include="..\..\src\ServerIdentity.cs" Link="ServerIdentity.cs" />
     <Compile Include="..\..\src\PersistentConfigStore.cs" Link="PersistentConfigStore.cs" />
     <Compile Include="..\..\src\BootstrapFetchDebouncer.cs" Link="BootstrapFetchDebouncer.cs" />
+    <Compile Include="..\..\src\SecretRedactor.cs" Link="SecretRedactor.cs" />
   </ItemGroup>
 
   <ItemGroup>

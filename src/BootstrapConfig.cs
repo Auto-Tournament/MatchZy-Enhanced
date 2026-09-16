@@ -151,7 +151,7 @@ namespace MatchZy
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        Log($"[Bootstrap] Fetch failed ({(int)response.StatusCode}): {body}");
+                        Log($"[Bootstrap] Fetch failed ({(int)response.StatusCode}): {SecretRedactor.RedactText(body)}");
                         return;
                     }
 
@@ -198,7 +198,7 @@ namespace MatchZy
             {
                 foreach (string warning in BootstrapPayloadCheck.ServerIdWarnings(url, commands, matchReportServerId.Value))
                 {
-                    Log(warning);
+                    Log(SecretRedactor.RedactText(warning));
                 }
 
                 Log($"[Bootstrap] Applying {commands!.Length} bootstrap commands ({reason})");

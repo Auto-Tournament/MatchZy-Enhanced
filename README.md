@@ -76,6 +76,20 @@ If the payload sets a `matchzy_server_id` that differs from the id in the bootst
 the id the server already had, a `[Bootstrap] WARNING` is logged. The payload is still applied.
 This usually means the bootstrap URL is stale.
 
+#### Logs don't contain secrets
+
+Server logs, console output and chat never show secret values. The bootstrap, match and report
+tokens, remote log / demo upload / backup header values, `sv_password`, `rcon_password` and any
+other `*token*`, `*password*`, `*secret*` or `*header_value*` setting are logged as
+`(hidden, N chars)`. The same goes for those values inside logged payloads, match configs, HTTP
+responses, request headers and URL query strings (`?token=`). Logs are safe to share when asking
+for help.
+
+Older versions printed the token when saving it, e.g.
+`[SaveConfigValue] Saved config for server '...': matchzy_bootstrap_token = <token>`. If you
+shared logs from an older version, rotate the MAT `SERVER_TOKEN` and push the new token to your
+servers.
+
 ### Multi-server setups sharing one database
 
 Several servers can point at the same MySQL database. That is the point of a shared stats

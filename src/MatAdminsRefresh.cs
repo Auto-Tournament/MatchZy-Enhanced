@@ -55,7 +55,7 @@ namespace MatchZy
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
             {
-                Log($"[matchzy_admins] Invalid admins URL (must be http/https): {url}");
+                Log($"[matchzy_admins] Invalid admins URL (must be http/https): {SecretRedactor.RedactText(url)}");
                 return;
             }
 

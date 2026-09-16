@@ -3459,7 +3459,7 @@ namespace MatchZy
                 }
 
                 string renderedValue = IsSafeCVarValueUnquoted(trimmed) ? trimmed : QuoteAndEscape(trimmed);
-                Log($"[ExecuteChangedConvars] Execing: {key} {renderedValue}");
+                Log($"[ExecuteChangedConvars] Execing: {key} {(SecretRedactor.IsSecretKey(key) ? SecretRedactor.Hidden(trimmed) : renderedValue)}");
                 Server.ExecuteCommand($"{key} {renderedValue}");
             }
         }
@@ -3469,7 +3469,7 @@ namespace MatchZy
             foreach (string key in matchConfig.OriginalCvars.Keys)
             {
                 string value = matchConfig.OriginalCvars[key];
-                Log($"[ResetChangedConvars] Execing: {key} \"{value}\"");
+                Log($"[ResetChangedConvars] Execing: {key} \"{SecretRedactor.FormatValue(key, value)}\"");
                 Server.ExecuteCommand($"{key} {value}");
             }
         }
@@ -3849,7 +3849,7 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(remoteLogUrl))
                 {
                     matchConfig.RemoteLogURL = remoteLogUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_remote_log_url: {remoteLogUrl}");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_remote_log_url: {SecretRedactor.FormatValue("matchzy_remote_log_url", remoteLogUrl)}");
                 }
                 
                 // Load remote log header key
@@ -3865,7 +3865,7 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(remoteLogHeaderValue))
                 {
                     matchConfig.RemoteLogHeaderValue = remoteLogHeaderValue;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_remote_log_header_value (hidden for security)");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_remote_log_header_value {SecretRedactor.Hidden(remoteLogHeaderValue)}");
                 }
                 
                 // Load demo upload URL
@@ -3873,7 +3873,7 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(demoUploadUrl))
                 {
                     demoUploadURL = demoUploadUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_demo_upload_url: {demoUploadUrl}");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_demo_upload_url: {SecretRedactor.FormatValue("matchzy_demo_upload_url", demoUploadUrl)}");
                 }
                 
                 // Load chat prefix
@@ -3905,14 +3905,14 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(bootstrapUrl))
                 {
                     this.bootstrapUrl = bootstrapUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_bootstrap_url: {bootstrapUrl}");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_bootstrap_url: {SecretRedactor.FormatValue("matchzy_bootstrap_url", bootstrapUrl)}");
                 }
 
                 var bootstrapToken = database.LoadConfigValue("matchzy_bootstrap_token");
                 if (!string.IsNullOrEmpty(bootstrapToken))
                 {
                     this.bootstrapToken = bootstrapToken;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_bootstrap_token (hidden for security)");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_bootstrap_token {SecretRedactor.Hidden(bootstrapToken)}");
                 }
 
                 // Load MAT heartbeat integration settings
@@ -3920,21 +3920,21 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(heartbeatUrl))
                 {
                     this.heartbeatUrl = heartbeatUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_heartbeat_url: {heartbeatUrl}");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_heartbeat_url: {SecretRedactor.FormatValue("matchzy_heartbeat_url", heartbeatUrl)}");
                 }
 
                 var matchToken = database.LoadConfigValue("matchzy_match_token");
                 if (!string.IsNullOrEmpty(matchToken))
                 {
                     this.matchToken = matchToken;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_match_token (hidden for security)");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_match_token {SecretRedactor.Hidden(matchToken)}");
                 }
 
                 var webhookUrl = database.LoadConfigValue("matchzy_webhook_url");
                 if (!string.IsNullOrEmpty(webhookUrl))
                 {
                     this.webhookUrl = webhookUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_webhook_url: {webhookUrl}");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_webhook_url: {SecretRedactor.FormatValue("matchzy_webhook_url", webhookUrl)}");
                 }
 
                 // Load report endpoint if it was persisted by a controller
@@ -3942,7 +3942,7 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(reportEndpoint))
                 {
                     matchReportEndpoint.Value = reportEndpoint;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_report_endpoint: {reportEndpoint}");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_report_endpoint: {SecretRedactor.FormatValue("matchzy_report_endpoint", reportEndpoint)}");
                 }
 
                 // Load report token if it was persisted by a controller
@@ -3950,7 +3950,7 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(reportToken))
                 {
                     matchReportToken.Value = reportToken;
-                    Log("[LoadPersistentConfig] Loaded matchzy_report_token (hidden for security)");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_report_token {SecretRedactor.Hidden(reportToken)}");
                 }
 
                 // Load optional MAT admin list integration settings
@@ -3958,7 +3958,7 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(adminsUrl))
                 {
                     matchzyAdminsUrl = adminsUrl.Trim();
-                    Log($"[LoadPersistentConfig] Loaded matchzy_admins_url: {matchzyAdminsUrl}");
+                    Log($"[LoadPersistentConfig] Loaded matchzy_admins_url: {SecretRedactor.FormatValue("matchzy_admins_url", matchzyAdminsUrl)}");
                 }
 
                 var adminsRefreshSecondsRaw = database.LoadConfigValue("matchzy_admins_refresh_seconds");
@@ -4354,7 +4354,7 @@ namespace MatchZy
                 if (!string.IsNullOrEmpty(headerKey) && !string.IsNullOrEmpty(headerValue))
                 {
                     httpClient.DefaultRequestHeaders.Add(headerKey, headerValue);
-                    Log($"[UploadFileAsync]   - Custom header: {headerKey} = [REDACTED]");
+                    Log($"[UploadFileAsync]   - Custom header: {SecretRedactor.FormatCustomHeader(headerKey, headerValue)}");
                 }
 
                 HttpResponseMessage? response = null;
@@ -4367,7 +4367,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        Log($"[UploadFileAsync] Sending POST request to {fileUploadURL} (attempt {attempt}/{maxAttempts})...");
+                        Log($"[UploadFileAsync] Sending POST request to {SecretRedactor.RedactText(fileUploadURL)} (attempt {attempt}/{maxAttempts})...");
                         DateTime uploadStart = DateTime.Now;
                         response = await httpClient.PostAsync(fileUploadURL, content).ConfigureAwait(false);
                         uploadDuration = DateTime.Now - uploadStart;
@@ -4401,7 +4401,7 @@ namespace MatchZy
                     Log($"[UploadFileAsync] MatchId: {matchId}, MapNumber: {mapNumber}");
                     Log($"[UploadFileAsync] FileName: {fileName}");
                     Log($"[UploadFileAsync] FileSize: {fileSizeMB:F2} MB");
-                    Log($"[UploadFileAsync] Response: {responseBody}");
+                    Log($"[UploadFileAsync] Response: {SecretRedactor.RedactText(responseBody)}");
                     Log($"[UploadFileAsync] ===========================");
                     Log($"[DEMO_UPLOAD] SUCCESS matchId={matchId} map={mapNumber} sizeMB={fileSizeMB:F2} seconds={uploadDuration.TotalSeconds:F2} status={(int)response.StatusCode}");
 
@@ -4444,7 +4444,7 @@ namespace MatchZy
                     }
                     Log($"[UploadFileAsync] ===== Upload FAILED =====");
                     Log($"[UploadFileAsync] Status code: {response.StatusCode}");
-                    Log($"[UploadFileAsync] Response body: {responseBody}");
+                    Log($"[UploadFileAsync] Response body: {SecretRedactor.RedactText(responseBody)}");
                     Log($"[UploadFileAsync] MatchId: {matchId}, MapNumber: {mapNumber}");
                     Log($"[UploadFileAsync] FileName: {fileName}");
                     Log($"[UploadFileAsync] ===========================");
