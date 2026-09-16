@@ -231,9 +231,10 @@ namespace MatchZy
 
             // The current series is still finishing; step back from "queued" so the
             // allocator does not wait for a load that will no longer happen.
-            if (isMatchSetup && string.Equals(tournamentStatus.Value, "queued", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(tournamentStatus.Value, "queued", StringComparison.OrdinalIgnoreCase))
             {
-                UpdateTournamentStatus("postgame");
+                // Without a match there is no series to finish: go straight back to idle.
+                UpdateTournamentStatus(isMatchSetup ? "postgame" : TournamentStatusLogic.IdleStatus(isWarmup));
             }
 
             Log($"[MatchQueue] Cleared queued match {identifier ?? "unknown"} ({reason}).");
@@ -246,6 +247,14 @@ namespace MatchZy
             if (player != null) return;
 
             string? cleared = ClearQueuedMatch("matchzy_clear_queued_match");
+
+            // With no match on the server this is an idle server: make sure the status convars
+            // say so, so MAT can allocate it again even if a stale match id was left behind.
+            if (!isMatchSetup)
+            {
+                UpdateTournamentStatus(TournamentStatusLogic.IdleStatus(isWarmup));
+            }
+
             if (cleared == null)
             {
                 ReplyToUserCommand(player, "[MatchQueue] No queued match to clear. cleared_queued_match=none");

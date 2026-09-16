@@ -16,6 +16,7 @@
     <Compile Include="..\..\src\PersistentConfigStore.cs" Link="PersistentConfigStore.cs" />
     <Compile Include="..\..\src\BootstrapFetchDebouncer.cs" Link="BootstrapFetchDebouncer.cs" />
     <Compile Include="..\..\src\SecretRedactor.cs" Link="SecretRedactor.cs" />
+    <Compile Include="..\..\src\TournamentStatusLogic.cs" Link="TournamentStatusLogic.cs" />
   </ItemGroup>
 
   <ItemGroup>

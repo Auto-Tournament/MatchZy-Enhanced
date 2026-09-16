@@ -493,12 +493,12 @@ namespace MatchZy
         {
             try
             {
-                tournamentStatus.Value = status;
+                // Idle states never carry a match: MAT treats "idle" / "warmup with no match"
+                // as free, so a stale match id here keeps the server busy forever.
+                bool hasActiveMatch = TournamentStatusLogic.HasActiveMatch(isMatchSetup, tournamentStatus.Value, status);
 
-                if (!string.IsNullOrEmpty(matchSlug))
-                {
-                    tournamentMatch.Value = matchSlug;
-                }
+                tournamentStatus.Value = status;
+                tournamentMatch.Value = TournamentStatusLogic.ResolveMatchValue(status, matchSlug, tournamentMatch.Value, hasActiveMatch);
 
                 // Update timestamp to current Unix time
                 long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -1387,6 +1387,9 @@ namespace MatchZy
 
                 // Clear any queued next-match identifier when performing a full reset.
                 tournamentNextMatch.Value = "";
+                // The previous match config is no longer loaded. The match report falls back
+                // to it for the match slug, so it must not outlive the match.
+                loadedConfigFile = "";
 
                 if (warmupCfgRequired)
                 {
