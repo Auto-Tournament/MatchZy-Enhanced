@@ -2262,28 +2262,15 @@ namespace MatchZy
                 return;
             }
 
-            int remainingMaps = matchConfig.NumMaps - matchzyTeam1.seriesScore - matchzyTeam2.seriesScore;
+            // Remaining maps count every played map, drawn ones included. The old
+            // formula (NumMaps - series wins) ignored draws, so after a drawn map the
+            // series never ended and the next line indexed past the map list.
+            int remainingMaps = MatchLogic.RemainingMaps(matchConfig.NumMaps, matchConfig.Maplist.Count, currentMapNumber);
             Log($"[HandleMatchEnd] MATCH ENDED, remainingMaps: {remainingMaps}, NumMaps: {matchConfig.NumMaps}, Team1SeriesScore: {matchzyTeam1.seriesScore}, Team2SeriesScore: {matchzyTeam2.seriesScore}");
-            if (matchzyTeam1.seriesScore == matchzyTeam2.seriesScore && remainingMaps <= 0)
+            if (MatchLogic.IsSeriesOver(matchConfig.NumMaps, remainingMaps, matchzyTeam1.seriesScore, matchzyTeam2.seriesScore, matchConfig.SeriesCanClinch))
             {
-                EndSeries(null, restartDelay - 1, t1score, t2score);
-            }
-            else if (matchConfig.SeriesCanClinch)
-            {
-                int mapsToWinSeries = (matchConfig.NumMaps / 2) + 1;
-                if (matchzyTeam1.seriesScore == mapsToWinSeries)
-                {
-                    EndSeries(winnerName, restartDelay - 1, t1score, t2score);
-                    return;
-                }
-                else if (matchzyTeam2.seriesScore == mapsToWinSeries)
-                {
-                    EndSeries(winnerName, restartDelay - 1, t1score, t2score);
-                    return;
-                }
-            }
-            else if (remainingMaps <= 0)
-            {
+                // EndSeries picks the winner from the series score; a tied series score
+                // (only possible with draws allowed or an even map count) ends as a draw.
                 EndSeries(winnerName, restartDelay - 1, t1score, t2score);
                 return;
             }
@@ -2300,6 +2287,13 @@ namespace MatchZy
             else
             {
                 Server.PrintToChatAll($"{chatPrefix} The series is tied at {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}");
+            }
+            if (currentMapNumber + 1 >= matchConfig.Maplist.Count)
+            {
+                // Defensive: never index past the map list; end the series instead.
+                Log($"[HandleMatchEnd] No map left in maplist (count {matchConfig.Maplist.Count}) after map {currentMapNumber}; ending series.");
+                EndSeries(winnerName, restartDelay - 1, t1score, t2score);
+                return;
             }
             matchConfig.CurrentMapNumber += 1;
             string nextMap = matchConfig.Maplist[matchConfig.CurrentMapNumber];
@@ -2503,56 +2497,32 @@ namespace MatchZy
                 return CreditMapWinner(MatchLogic.ResolveMapWinnerSlot(t1score, t2score, null));
             }
 
-            // At this point the map is tied on score. Depending on the configured
-            // overtime behavior we either:
-            // - Treat this as a true draw (legacy behavior), or
-            // - Apply a performance-based tiebreaker to pick a winner.
-            //
-            // Current rule:
-            // - If the external config has explicitly disabled overtime and set
-            //   overtimeSegments = 0, we resolve ties by comparing aggregate team
-            //   performance instead of reporting a draw.
-            // - If overtime is enabled and overtimeSegments > 0, we also resolve
-            //   any final tie via the same performance-based tiebreaker. This lets
-            //   tournament flows express "no draws after OT" semantics while we
-            //   still rely on CS2 to run the OT rounds themselves.
-            bool overtimeDisabled =
-                !string.IsNullOrWhiteSpace(matchConfig.OvertimeMode) &&
-                matchConfig.OvertimeMode.Equals("disabled", StringComparison.OrdinalIgnoreCase);
-
-            int? overtimeSegments = matchConfig.OvertimeSegments;
-
-            // Interpret a missing overtimeSegments value as 0 when overtime is
-            // explicitly disabled. This makes `"overtimeMode": "disabled"` alone
-            // mean "no OT, no draws" without requiring the platform to always send
-            // an explicit `overtimeSegments: 0`.
-            bool disableOtNoDraw = overtimeDisabled && (!overtimeSegments.HasValue || overtimeSegments.Value == 0);
-
-            // When overtime is enabled and overtimeSegments > 0, we treat any final
-            // tie as "no draws after OT" and resolve it via the performance-based
-            // tiebreak.
-            bool enabledWithCap = !overtimeDisabled && overtimeSegments.HasValue && overtimeSegments.Value > 0;
-
-            bool performanceTiebreakRequested = disableOtNoDraw || enabledWithCap;
-
-            if (performanceTiebreakRequested)
+            // The map is tied on score. When the match config disallows draws
+            // (overtime disabled with 0 segments, or capped OT) the tie is broken by
+            // performance: damage, kills, headshot kills, utility damage, then a
+            // deterministic coin flip. A tied map is never recorded as a draw in that
+            // mode. When draws are allowed a tied map is recorded as a draw (legacy).
+            bool drawsDisallowed = MatchLogic.DrawsDisallowed(matchConfig.OvertimeMode, matchConfig.OvertimeSegments);
+            if (!drawsDisallowed)
             {
-                string? tiebreakSlot = GetPerformanceTiebreakWinnerSlot();
-                if (tiebreakSlot != null)
-                {
-                    (string tiebreakName, string slot) = CreditMapWinner(MatchLogic.ResolveMapWinnerSlot(t1score, t2score, tiebreakSlot));
-
-                    Log($"[Tiebreak] Map ended tied on score (team1={t1score}, team2={t2score}). " +
-                        $"Overtime disabled with overtimeSegments=0, selecting '{tiebreakName}' ({slot}) as winner based on performance metrics.");
-
-                    return (tiebreakName, slot);
-                }
-
-                Log($"[Tiebreak] Map ended tied on score and performance metrics were also tied; " +
-                    $"falling back to a recorded draw.");
+                Log($"[Tiebreak] Map ended tied on score (team1={t1score}, team2={t2score}) and draws are allowed; recording a draw.");
+                return ("Draw", MatchLogic.NoTeam);
             }
 
-            return ("Draw", MatchLogic.NoTeam);
+            (MatchLogic.TiebreakTotals team1Totals, MatchLogic.TiebreakTotals team2Totals) = GetTiebreakTotals();
+            int mapNumber = matchConfig.CurrentMapNumber;
+            (string? tiebreakSlot, string criterion) = MatchLogic.ResolveTiedMap(team1Totals, team2Totals, drawsDisallowed: true, liveMatchId, mapNumber);
+
+            if (criterion == MatchLogic.CoinFlipCriterion)
+            {
+                Log($"[Tiebreak] All performance criteria tied; deterministic coin flip (matchId={liveMatchId}, mapNumber={mapNumber}) picked {tiebreakSlot}.");
+            }
+
+            (string tiebreakName, string slot) = CreditMapWinner(MatchLogic.ResolveMapWinnerSlot(t1score, t2score, tiebreakSlot));
+            Log($"[Tiebreak] Map ended tied on score (team1={t1score}, team2={t2score}). Draws disallowed " +
+                $"(overtimeMode={matchConfig.OvertimeMode ?? "(unset)"}, overtimeSegments={matchConfig.OvertimeSegments?.ToString() ?? "(unset)"}); " +
+                $"selecting '{tiebreakName}' ({slot}) as winner by {criterion}.");
+            return (tiebreakName, slot);
         }
 
         private (string winnerName, string winnerSlot) CreditMapWinner(string slot)
@@ -2571,59 +2541,47 @@ namespace MatchZy
         }
 
         /// <summary>
-        /// Computes a performance-based tiebreak winner using per-player stats for
-        /// the current map. Currently this aggregates total Damage dealt by each
-        /// team (as reported by ActionTrackingServices) and picks the team with the
-        /// higher total. If both teams have identical Damage, this returns null and
-        /// the caller should treat the result as a true draw.
+        /// Aggregates the per-team tiebreak criteria (damage, kills, headshot kills,
+        /// utility damage) from the current map's player stats. On failure returns
+        /// zeroed totals, so the caller falls through to the deterministic coin flip
+        /// rather than recording a draw.
         /// </summary>
-        /// <returns>The winning team slot ("team1"/"team2"), or null if still tied.</returns>
-        private string? GetPerformanceTiebreakWinnerSlot()
+        private (MatchLogic.TiebreakTotals team1, MatchLogic.TiebreakTotals team2) GetTiebreakTotals()
         {
+            int d1 = 0, k1 = 0, h1 = 0, u1 = 0;
+            int d2 = 0, k2 = 0, h2 = 0, u2 = 0;
             try
             {
                 (Dictionary<ulong, Dictionary<string, object>> playerStatsDictionary, _, _) = GetPlayerStatsDict();
 
-                int team1DamageTotal = 0;
-                int team2DamageTotal = 0;
+                static int Stat(Dictionary<string, object> stats, string key) =>
+                    stats.TryGetValue(key, out var value) && int.TryParse(value?.ToString(), out int parsed) ? parsed : 0;
 
-                foreach (var kvp in playerStatsDictionary)
+                foreach (var stats in playerStatsDictionary.Values)
                 {
-                    var stats = kvp.Value;
-
-                    if (!stats.TryGetValue("TeamName", out var teamNameObj) ||
-                        !stats.TryGetValue("Damage", out var damageObj))
-                    {
-                        continue;
-                    }
-
-                    string teamName = teamNameObj.ToString() ?? string.Empty;
-                    if (!int.TryParse(damageObj.ToString(), out int damage))
-                    {
-                        continue;
-                    }
+                    if (!stats.TryGetValue("TeamName", out var teamNameObj)) continue;
+                    string teamName = teamNameObj?.ToString() ?? string.Empty;
 
                     if (teamName == matchzyTeam1.teamName)
                     {
-                        team1DamageTotal += damage;
+                        d1 += Stat(stats, "Damage"); k1 += Stat(stats, "Kills");
+                        h1 += Stat(stats, "HeadShotKills"); u1 += Stat(stats, "UtilityDamage");
                     }
                     else if (teamName == matchzyTeam2.teamName)
                     {
-                        team2DamageTotal += damage;
+                        d2 += Stat(stats, "Damage"); k2 += Stat(stats, "Kills");
+                        h2 += Stat(stats, "HeadShotKills"); u2 += Stat(stats, "UtilityDamage");
                     }
                 }
-
-                Log($"[Tiebreak] Aggregate damage totals - {matchzyTeam1.teamName}: {team1DamageTotal}, {matchzyTeam2.teamName}: {team2DamageTotal}");
-
-                // A perfect tie on damage as well returns null – extremely unlikely, but
-                // in this case we deliberately do NOT pick an arbitrary winner.
-                return MatchLogic.ResolveDamageTiebreakSlot(team1DamageTotal, team2DamageTotal);
             }
             catch (Exception ex)
             {
-                Log($"[Tiebreak FATAL] Failed to compute performance-based tiebreak winner: {ex.Message}");
-                return null;
+                Log($"[Tiebreak FATAL] Failed to aggregate tiebreak stats: {ex.Message}");
             }
+
+            Log($"[Tiebreak] Aggregate totals (damage/kills/headshot_kills/utility_damage) - " +
+                $"{matchzyTeam1.teamName}: {d1}/{k1}/{h1}/{u1}, {matchzyTeam2.teamName}: {d2}/{k2}/{h2}/{u2}");
+            return (new MatchLogic.TiebreakTotals(d1, k1, h1, u1), new MatchLogic.TiebreakTotals(d2, k2, h2, u2));
         }
 
         private (int t1score, int t2score) GetTeamsScore()
