@@ -38,6 +38,46 @@ namespace MatchZy
         public bool LastHealthOk { get; private set; } = true;
         public string? LastHealthError { get; private set; } = null;
 
+        /// <summary>
+        /// Supplies this server's identity for scoping rows in the shared database. Set by the
+        /// plugin after config.cfg has been executed, so an explicit matchzy_config_scope is
+        /// visible. Resolved lazily and cached, so the scope cannot change mid-process.
+        /// </summary>
+        public Func<string>? ScopeProvider { get; set; }
+
+        private string? resolvedScope;
+
+        /// <summary>
+        /// This server's scope, resolved once per process. Falls back to the legacy scope when no
+        /// provider is set (which only happens outside the game server), so behaviour matches the
+        /// pre-scoping plugin rather than failing.
+        /// </summary>
+        public string ServerScope
+        {
+            get
+            {
+                if (resolvedScope != null) return resolvedScope;
+
+                try
+                {
+                    resolvedScope = ScopeProvider?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Log($"[ServerScope] Error resolving server scope: {ex.Message}");
+                }
+
+                if (string.IsNullOrEmpty(resolvedScope))
+                {
+                    resolvedScope = ServerIdentity.LegacyScope;
+                }
+
+                return resolvedScope;
+            }
+        }
+
+        private bool IsSqlite => connection is SqliteConnection;
+
         public void InitializeDatabase(string directory)
         {
             ConnectDatabase(directory);
@@ -58,20 +98,19 @@ namespace MatchZy
                 Log("[InitializeDatabase] Table matchzy_stats_players created (or already exists)");
                 Log("[InitializeDatabase] Table matchzy_stats_maps created (or already exists)");
                 
-                // Create server config table for persistent configuration
-                if (connection is SqliteConnection) {
-                    CreateServerConfigTableSQLite();
-                } else {
-                    CreateServerConfigTableSQL();
-                }
+                // Create (or migrate) the server config table for persistent configuration.
+                // Both tables below hold per-server state and are scoped by server identity so
+                // several servers can share one database; see PersistentConfigStore.
+                PersistentConfigStore.EnsureConfigSchema(connection, IsSqlite, Log);
                 Log("[InitializeDatabase] Table matchzy_server_config created (or already exists)");
-                
+
                 // Create event queue table for reliable event delivery
                 if (connection is SqliteConnection) {
                     CreateEventQueueTableSQLite();
                 } else {
                     CreateEventQueueTableSQL();
                 }
+                PersistentConfigStore.EnsureEventQueueSchema(connection, IsSqlite, Log);
                 Log("[InitializeDatabase] Table matchzy_event_queue created (or already exists)");
             }
             catch (Exception ex)
@@ -327,26 +366,6 @@ namespace MatchZy
             )");
         }
 
-        public void CreateServerConfigTableSQLite()
-        {
-            connection.Execute(@"
-                CREATE TABLE IF NOT EXISTS matchzy_server_config (
-                    config_key TEXT PRIMARY KEY,
-                    config_value TEXT NOT NULL,
-                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )");
-        }
-
-        public void CreateServerConfigTableSQL()
-        {
-            connection.Execute(@"
-                CREATE TABLE IF NOT EXISTS matchzy_server_config (
-                    config_key VARCHAR(255) PRIMARY KEY,
-                    config_value TEXT NOT NULL,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                )");
-        }
-
         public void CreateEventQueueTableSQLite()
         {
             connection.Execute(@"
@@ -361,7 +380,8 @@ namespace MatchZy
                     last_retry DATETIME,
                     next_retry DATETIME,
                     status TEXT DEFAULT 'pending',
-                    error_message TEXT
+                    error_message TEXT,
+                    server_scope TEXT NOT NULL DEFAULT ''
                 )");
             
             // Create index for efficient querying of pending events
@@ -385,12 +405,16 @@ namespace MatchZy
                     next_retry TIMESTAMP NULL,
                     status VARCHAR(20) DEFAULT 'pending',
                     error_message TEXT,
-                    INDEX idx_status_retry (status, next_retry)
+                    server_scope VARCHAR(190) NOT NULL DEFAULT '',
+                    INDEX idx_status_retry (status, next_retry),
+                    INDEX idx_event_queue_scope_status (server_scope, status, next_retry)
                 )");
         }
 
         /// <summary>
-        /// Loads a configuration value from the database
+        /// Loads a configuration value from the database.
+        /// Prefers this server's scoped row and falls back to the legacy (pre-scoping) row, so a
+        /// single-server install keeps reading the values it already had.
         /// </summary>
         public string? LoadConfigValue(string key)
         {
@@ -400,10 +424,7 @@ namespace MatchZy
                 {
                     connection.Open();
                 }
-                var result = connection.QueryFirstOrDefault<string>(
-                    "SELECT config_value FROM matchzy_server_config WHERE config_key = @Key",
-                    new { Key = key }
-                );
+                var result = PersistentConfigStore.LoadConfigValue(connection, key, ServerScope);
                 if (connection.State == ConnectionState.Open)
                 {
                     connection.Close();
@@ -444,25 +465,15 @@ namespace MatchZy
                     ? "datetime('now', '+30 seconds')" 
                     : "DATE_ADD(NOW(), INTERVAL 30 SECOND)";
                 
-                if (connection is SqliteConnection)
-                {
-                    connection.Execute($@"
-                        INSERT INTO matchzy_event_queue 
-                        (event_type, event_data, match_id, map_number, error_message, next_retry) 
-                        VALUES (@EventType, @EventData, @MatchId, @MapNumber, @ErrorMessage, {nextRetryExpression})",
-                        new { EventType = eventType, EventData = eventData, MatchId = matchId, MapNumber = mapNumber, ErrorMessage = errorMessage }
-                    );
-                }
-                else
-                {
-                    connection.Execute($@"
-                        INSERT INTO matchzy_event_queue 
-                        (event_type, event_data, match_id, map_number, error_message, next_retry) 
-                        VALUES (@EventType, @EventData, @MatchId, @MapNumber, @ErrorMessage, {nextRetryExpression})",
-                        new { EventType = eventType, EventData = eventData, MatchId = matchId, MapNumber = mapNumber, ErrorMessage = errorMessage }
-                    );
-                }
-                
+                // Stamped with this server's scope so a shared database does not let one server
+                // retry another server's events against the wrong remote log URL and headers.
+                connection.Execute($@"
+                    INSERT INTO matchzy_event_queue
+                    (event_type, event_data, match_id, map_number, error_message, next_retry, server_scope)
+                    VALUES (@EventType, @EventData, @MatchId, @MapNumber, @ErrorMessage, {nextRetryExpression}, @Scope)",
+                    new { EventType = eventType, EventData = eventData, MatchId = matchId, MapNumber = mapNumber, ErrorMessage = errorMessage, Scope = ServerScope }
+                );
+
                 if (connection.State == ConnectionState.Open)
                 {
                     connection.Close();
@@ -502,12 +513,13 @@ namespace MatchZy
                 var events = connection.Query<QueuedEvent>($@"
                     SELECT id, event_type, event_data, match_id, map_number, retry_count
                     FROM matchzy_event_queue
-                    WHERE status = 'pending' 
+                    WHERE status = 'pending'
+                    AND {PersistentConfigStore.PendingEventsScopeClause}
                     AND (next_retry IS NULL OR next_retry <= {nowExpression})
                     AND retry_count < 20
                     ORDER BY created_at ASC
                     LIMIT {limit}
-                ").ToList();
+                ", new { Scope = ServerScope, LegacyScope = ServerIdentity.LegacyScope }).ToList();
                 
                 if (connection.State == ConnectionState.Open)
                 {
@@ -659,9 +671,12 @@ namespace MatchZy
                     ? "datetime('now', '-7 days')"
                     : "DATE_SUB(NOW(), INTERVAL 7 DAY)";
                 
+                // Deliberately unscoped: these events have already been delivered, so removing
+                // them is pure housekeeping. Keeping it global also stops a decommissioned
+                // server's rows accumulating forever in a shared database.
                 int deleted = connection.Execute($@"
-                    DELETE FROM matchzy_event_queue 
-                    WHERE status = 'sent' 
+                    DELETE FROM matchzy_event_queue
+                    WHERE status = 'sent'
                     AND created_at < {dateExpression}
                 ");
                 
@@ -703,16 +718,20 @@ namespace MatchZy
                     connection.Open();
                 }
                 
-                int deleted = connection.Execute(@"
-                    DELETE FROM matchzy_event_queue 
+                // Only this server's (and pre-scoping legacy) events. Clearing the queue happens
+                // when this server's remote log URL changes, which says nothing about the events
+                // another server on the same database still needs to send.
+                int deleted = connection.Execute($@"
+                    DELETE FROM matchzy_event_queue
                     WHERE status IN ('pending', 'failed')
-                ");
-                
+                    AND {PersistentConfigStore.PendingEventsScopeClause}
+                ", new { Scope = ServerScope, LegacyScope = ServerIdentity.LegacyScope });
+
                 if (connection.State == ConnectionState.Open)
                 {
                     connection.Close();
                 }
-                
+
                 Log($"[ClearEventQueue] Cleared {deleted} pending/failed events from queue.");
                 return deleted;
             }
@@ -734,7 +753,9 @@ namespace MatchZy
         }
 
         /// <summary>
-        /// Saves a configuration value to the database (insert or update)
+        /// Saves a configuration value to the database (insert or update).
+        /// Always writes this server's scoped row; the legacy row is never overwritten, so one
+        /// server writing can no longer change what another server loads.
         /// </summary>
         public void SaveConfigValue(string key, string value)
         {
@@ -744,35 +765,14 @@ namespace MatchZy
                 {
                     connection.Open();
                 }
-                
-                if (connection is SqliteConnection)
-                {
-                    connection.Execute(@"
-                        INSERT INTO matchzy_server_config (config_key, config_value, updated_at) 
-                        VALUES (@Key, @Value, datetime('now'))
-                        ON CONFLICT(config_key) DO UPDATE SET 
-                            config_value = @Value,
-                            updated_at = datetime('now')",
-                        new { Key = key, Value = value }
-                    );
-                }
-                else
-                {
-                    connection.Execute(@"
-                        INSERT INTO matchzy_server_config (config_key, config_value) 
-                        VALUES (@Key, @Value)
-                        ON DUPLICATE KEY UPDATE 
-                            config_value = @Value,
-                            updated_at = CURRENT_TIMESTAMP",
-                        new { Key = key, Value = value }
-                    );
-                }
-                
+
+                PersistentConfigStore.SaveConfigValue(connection, IsSqlite, key, value, ServerScope);
+
                 if (connection.State == ConnectionState.Open)
                 {
                     connection.Close();
                 }
-                Log($"[SaveConfigValue] Saved config: {key} = {value}");
+                Log($"[SaveConfigValue] Saved config for server '{ServerScope}': {key} = {value}");
             }
             catch (Exception ex)
             {

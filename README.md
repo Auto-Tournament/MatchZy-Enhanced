@@ -56,6 +56,65 @@ The queued match is loaded only by the automatic reset after a series ends. It i
 - `css_restart` or `css_endmatch` resets the server. The reply includes `cleared_queued_match=<id>`.
 - `matchzy_clear_queued_match` is run. This is server console / RCON only. The reply is `cleared_queued_match=<id>`, or `cleared_queued_match=none` when nothing was queued.
 
+### Multi-server setups sharing one database
+
+Several servers can point at the same MySQL database. That is the point of a shared stats
+database, and it now works for persistent config too.
+
+Everything MatchZy persists — the `matchzy_server_config` table and the event retry queue — is
+stored against an identity for the server that wrote it, so one server can no longer overwrite
+another's values. Before this, whichever server wrote last won, and on restart every server on the
+box loaded that one server's `matchzy_server_id`, bootstrap URL and remote log settings.
+
+**The settings that are now per server**, i.e. each server keeps its own value:
+
+- `matchzy_server_id`
+- `matchzy_bootstrap_url`, `matchzy_bootstrap_token`
+- `matchzy_remote_log_url`, `matchzy_remote_log_header_key`, `matchzy_remote_log_header_value`
+- `matchzy_webhook_url`, `matchzy_heartbeat_url`
+- `matchzy_report_endpoint`, `matchzy_report_token`, `matchzy_match_token`
+- `matchzy_demo_upload_url`
+- `matchzy_admins_url`, `matchzy_admins_refresh_seconds`
+- `matchzy_chat_prefix`, `matchzy_admin_chat_prefix`
+- all `matchzy_warmup_*` settings
+
+The chat prefixes and the warmup settings are usually the same on every server, but they are
+scoped the same way as the rest: one shared row for them was only ever an accident of the old
+storage, and "last writer wins" is not a useful way to share a value. Set them per server, or
+leave the existing shared value in place (see backwards compatibility below).
+
+Genuinely global data — match, map and player stats in `matchzy_stats_*` — is untouched and stays
+shared, which is why you point several servers at one database in the first place.
+
+**How a server identifies itself.** The identity is derived from the bind address and the game
+port, e.g. `cs2:27015`, `cs2:27025`, `cs2:27035` for three servers on a box named `cs2`. The bind
+address is used when it names a real interface; CS2 servers are nearly always started with
+`-ip 0.0.0.0`, which identifies nothing, so the machine name is used instead. Nothing has to be
+configured for this to work, including before a controller like MAT has ever talked to the server.
+
+Two things change a server's identity: changing its game port, and renaming the box. Neither
+loses data — the server simply finds no row of its own and falls back to the shared pre-upgrade
+row, and a controller re-pushes its values on the next configure. To pin a name that survives
+both, set an explicit scope:
+
+```
+# in the server's start arguments (reliable: config.cfg may not have executed yet)
++matchzy_config_scope tournament-eu-3
+```
+
+`matchzy_config_scope` can also go in `config.cfg`, but the start-argument form is the one to
+prefer. It is never persisted to the database — a value that decides which rows you read cannot
+itself be read from those rows.
+
+**Backwards compatibility.** Rows written before this change are kept and treated as shared
+fallbacks. A server reads its own row when it has one and the shared row otherwise, and only ever
+writes its own row. So one server per database keeps working with no operator action, and a
+multi-server setup keeps its current behaviour until each server writes its own values. The
+schema migration runs automatically on startup and is a no-op once applied.
+
+If you worked around this by moving servers to per-server SQLite files, you can move them back to
+the shared MySQL database.
+
 ### Player Features
 - 🚀 **Auto-ready system** — Instant match starts (optional)
 - ⏸️ **Enhanced pauses** — Team limits, timeouts, dual unpause

@@ -165,7 +165,12 @@ namespace MatchZy
 
             // This sets default config ConVars
             Server.ExecuteCommand("execifexists MatchZy/config.cfg");
-            
+
+            // Persistent config is scoped per server so several servers can share one database.
+            // Wired after config.cfg has run so an explicit matchzy_config_scope is visible; the
+            // scope itself is resolved lazily on first use and then cached.
+            database.ScopeProvider = ResolveServerConfigScope;
+
             // Load persistent configuration from database (overrides config.cfg if values exist)
             LoadPersistentConfig();
             
