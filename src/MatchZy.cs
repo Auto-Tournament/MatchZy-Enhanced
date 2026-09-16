@@ -61,7 +61,6 @@ namespace MatchZy
         // Bootstrap init (one-shot configuration pull)
         private string bootstrapUrl = "";
         private string bootstrapToken = "";
-        private bool bootstrapFetchInProgress = false;
         private long lastBootstrapAttemptAt = 0;
 
         // MAT heartbeat integration (server -> allocator API)

@@ -104,7 +104,7 @@ namespace MatchZy
             Server.ExecuteCommand("matchzy_remote_log_header_key \"X-MatchZy-Token\"");
             Server.ExecuteCommand($"matchzy_remote_log_header_value \"{matchToken}\"");
 
-            // Configure bootstrap token (used by TryBootstrapFetch()).
+            // Configure bootstrap token (a change schedules a debounced bootstrap fetch).
             Server.ExecuteCommand($"matchzy_bootstrap_token \"{matchToken}\"");
 
             // Configure match report token used by /api/events/report auth.
