@@ -15,7 +15,7 @@ namespace MatchZy
 
         public override string ModuleName => "MatchZy";
 
-        public override string ModuleVersion => "1.4.30";
+        public override string ModuleVersion => "1.4.31";
 
         public override string ModuleAuthor => "sivert (https://github.com/sivert-io/)";
 
