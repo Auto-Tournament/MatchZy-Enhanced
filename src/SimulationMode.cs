@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Cvars;
+using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Newtonsoft.Json.Linq;
 
@@ -31,14 +34,317 @@ public partial class MatchZy
     // MaybeStartSimulationFlow().
     private bool simulationFlowStarted = false;
 
+    // Set once the simulated ready flow has run for this map; bots mapped after that are
+    // readied straight away by the reconcile pass.
+    private bool simulationReadyFlowRan = false;
+
+    // Warmup watchdog: when the per-map flow started (real time), how often it has had to
+    // reconcile, and whether a reconcile is already queued.
+    private DateTime simulationWarmupStartedUtc = DateTime.MinValue;
+    private CounterStrikeSharp.API.Modules.Timers.Timer? simulationWatchdogTimer = null;
+    private int simulationWatchdogAttempts = 0;
+    private bool simulationReconcilePending = false;
+
     private void ClearSimulationState()
     {
         simulationPlayersByUserId.Clear();
         simulationIdentityPool.Clear();
         assignedSimulationSteamIds.Clear();
         simulationReadyFlowScheduled = false;
+        simulationReadyFlowRan = false;
         simulationFlowStarted = false;
+        StopSimulationWatchdog();
+        simulationReconcilePending = false;
         isSimulationMode = false;
+    }
+
+    private static bool IsConnectedSimulationBot(CCSPlayerController? player)
+    {
+        return player != null
+            && player.IsValid
+            && player.IsBot
+            && !player.IsHLTV
+            && player.UserId.HasValue
+            && player.Connected == PlayerConnectedState.PlayerConnected;
+    }
+
+    /// <summary>
+    /// The bot currently holding the roster slot for <paramref name="steamId"/>, looked up from the
+    /// live engine controller rather than a remembered one (UserIds are reused by new bots).
+    /// </summary>
+    private CCSPlayerController? FindSimulationBotForSlot(string steamId)
+    {
+        foreach (var kv in simulationPlayersByUserId)
+        {
+            if (kv.Value.ConfigSteamId != steamId) continue;
+            var controller = Utilities.GetPlayerFromUserid(kv.Key);
+            if (IsConnectedSimulationBot(controller)) return controller;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Drops the mapping for a bot that left and frees its roster slot so another bot can take it.
+    /// Previously the mapping was removed but the SteamID stayed "assigned", so the slot could
+    /// never be filled again.
+    /// </summary>
+    private void ReleaseSimulationSlot(int userId, string reason)
+    {
+        if (!simulationPlayersByUserId.Remove(userId, out var identity)) return;
+
+        bool stillHeld = false;
+        foreach (var other in simulationPlayersByUserId.Values)
+        {
+            if (other.ConfigSteamId == identity.ConfigSteamId) { stillHeld = true; break; }
+        }
+        if (!stillHeld) assignedSimulationSteamIds.Remove(identity.ConfigSteamId);
+
+        Log($"[SimulationMode] Released roster slot {identity.ConfigName} ({identity.ConfigSteamId}, {identity.TeamSlot}) from UserId={userId} ({reason}).");
+
+        if (isMatchSetup && readyAvailable && !matchStarted)
+        {
+            RequestSimulationReconcile($"slot released: {reason}");
+        }
+    }
+
+    /// <summary>Queues one reconcile pass shortly (coalesces bursts of disconnects/failed readies).</summary>
+    private void RequestSimulationReconcile(string reason)
+    {
+        if (!isSimulationMode || simulationReconcilePending) return;
+        simulationReconcilePending = true;
+        Log($"[SimulationMode] Reconcile requested ({reason}); running in 3s.");
+        AddTimer(3.0f, () =>
+        {
+            simulationReconcilePending = false;
+            ReconcileSimulationRoster(reason, forceReady: false);
+        });
+    }
+
+    /// <summary>
+    /// Brings the simulation roster back in line with the bots that are connected now:
+    /// drops mappings and tracking for bots that are gone, maps unmapped bots to free slots,
+    /// refreshes player tracking with the live controllers, adds bots for slots nobody holds,
+    /// and readies mapped bots (always when <paramref name="forceReady"/>, otherwise once the
+    /// ready flow has already run for this map).
+    /// </summary>
+    private void ReconcileSimulationRoster(string reason, bool forceReady)
+    {
+        if (!isSimulationMode || simulationIdentityPool.Count == 0) return;
+        if (matchStarted || !readyAvailable)
+        {
+            Log($"[SimulationMode] Reconcile ({reason}) skipped: matchStarted={matchStarted}, readyAvailable={readyAvailable}.");
+            return;
+        }
+
+        string team1Side = teamSides.TryGetValue(matchzyTeam1, out var side1) ? side1 : "CT";
+
+        var liveControllers = new Dictionary<int, CCSPlayerController>();
+        var liveBots = new List<SimLiveBot>();
+        foreach (var controller in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
+        {
+            if (!IsConnectedSimulationBot(controller)) continue;
+            int uid = controller.UserId!.Value;
+            liveControllers[uid] = controller;
+            liveBots.Add(new SimLiveBot(uid, MatchLogic.SlotForTeamNum(controller.TeamNum, team1Side)));
+        }
+
+        var roster = new List<SimRosterSlot>();
+        var identityBySteamId = new Dictionary<string, SimulationPlayerIdentity>();
+        foreach (var identity in simulationIdentityPool)
+        {
+            roster.Add(new SimRosterSlot(identity.ConfigSteamId, identity.TeamSlot));
+            identityBySteamId[identity.ConfigSteamId] = identity;
+        }
+
+        var mappings = new Dictionary<int, string>();
+        foreach (var kv in simulationPlayersByUserId) mappings[kv.Key] = kv.Value.ConfigSteamId;
+
+        var plan = SimulationRosterLogic.Reconcile(roster, mappings, liveBots);
+        Log($"[SimulationMode] Reconcile ({reason}, forceReady={forceReady}): liveBots={liveBots.Count}, mapped={mappings.Count}, stale={plan.StaleUserIds.Count}, newAssignments={plan.NewAssignments.Count}, missingSlots={plan.MissingSlots.Count}.");
+
+        foreach (int staleId in plan.StaleUserIds)
+        {
+            simulationPlayersByUserId.Remove(staleId);
+            if (!liveControllers.ContainsKey(staleId))
+            {
+                playerData.Remove(staleId);
+                playerReadyStatus.Remove(staleId);
+            }
+            Log($"[SimulationMode] Reconcile: dropped stale mapping for UserId={staleId}.");
+        }
+
+        var newlyMapped = new List<int>();
+        foreach (var kv in plan.NewAssignments)
+        {
+            if (!identityBySteamId.TryGetValue(kv.Value, out var identity)) continue;
+            simulationPlayersByUserId[kv.Key] = identity;
+            newlyMapped.Add(kv.Key);
+            Log($"[SimulationMode] Reconcile: mapped bot UserId={kv.Key} ({liveControllers[kv.Key].PlayerName}) to {identity.ConfigName} ({identity.ConfigSteamId}, {identity.TeamSlot}).");
+        }
+
+        assignedSimulationSteamIds.Clear();
+        foreach (var identity in simulationPlayersByUserId.Values) assignedSimulationSteamIds.Add(identity.ConfigSteamId);
+
+        // Refresh tracking with the live controllers. A remembered controller under a reused
+        // UserId is what left match 64 counting 4 players on a team of 5.
+        foreach (var kv in simulationPlayersByUserId)
+        {
+            if (!liveControllers.TryGetValue(kv.Key, out var controller)) continue;
+            bool sameController = playerData.TryGetValue(kv.Key, out var known)
+                && known != null && known.IsValid && known.Handle == controller.Handle;
+            playerData[kv.Key] = controller;
+            if (!sameController || !playerReadyStatus.ContainsKey(kv.Key))
+            {
+                playerReadyStatus[kv.Key] = false;
+            }
+        }
+        connectedPlayers = GetRealPlayersCount();
+
+        foreach (int uid in newlyMapped)
+        {
+            if (string.IsNullOrEmpty(matchConfig.RemoteLogURL) || !isMatchSetup) break;
+            var info = BuildPlayerInfo(liveControllers[uid], "none");
+            var connectEvent = new MatchZyPlayerConnectedEvent { MatchId = liveMatchId, Player = info };
+            Task.Run(async () => { await SendEventAsync(connectEvent); });
+        }
+
+        if (plan.MissingSlots.Count > 0)
+        {
+            AddSimulationBotsForMissingSlots(plan.MissingSlots, team1Side, forceReady);
+        }
+
+        if (forceReady || simulationReadyFlowRan)
+        {
+            foreach (var kv in simulationPlayersByUserId)
+            {
+                if (!liveControllers.TryGetValue(kv.Key, out var controller)) continue;
+                if (playerReadyStatus.TryGetValue(kv.Key, out bool ready) && ready) continue;
+                Log($"[SimulationMode] Reconcile: readying {kv.Value.ConfigName} (UserId={kv.Key}).");
+                OnPlayerReady(controller, null);
+                if (matchStarted || !readyAvailable) return;
+            }
+
+            if (plan.MissingSlots.Count == 0 || forceReady)
+            {
+                teamReadyOverride[CsTeam.CounterTerrorist] = true;
+                teamReadyOverride[CsTeam.Terrorist] = true;
+                CheckAndSendTeamReadyEvent();
+                CheckLiveRequired();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds one bot per roster slot that no connected bot holds, then reconciles again so the
+    /// new bots are mapped and readied.
+    /// </summary>
+    private void AddSimulationBotsForMissingSlots(IReadOnlyList<SimRosterSlot> missingSlots, string team1Side, bool forceReady)
+    {
+        int rosterCount = simulationIdentityPool.Count;
+        for (int i = 0; i < missingSlots.Count; i++)
+        {
+            string side = SimulationRosterLogic.SideForTeamSlot(missingSlots[i].TeamSlot, team1Side);
+            string slotId = missingSlots[i].SteamId;
+            AddTimer(i * 1.0f, () =>
+            {
+                if (!isSimulationMode || matchStarted || !readyAvailable) return;
+
+                int liveCount = 0;
+                foreach (var controller in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
+                {
+                    if (IsConnectedSimulationBot(controller)) liveCount++;
+                }
+                if (liveCount >= rosterCount)
+                {
+                    Log($"[SimulationMode] Reconcile: not adding a bot for slot {slotId}; {liveCount} bots already connected for {rosterCount} slots.");
+                    return;
+                }
+
+                int quota = 0;
+                try { quota = ConVar.Find("bot_quota")?.GetPrimitiveValue<int>() ?? 0; } catch { }
+
+                // If the quota already expects more bots than are connected the engine is not
+                // refilling it, so add explicitly; otherwise raise the quota by one on the side.
+                string cmd = quota > liveCount
+                    ? $"bot_join_team {side}; bot_add_{side.ToLowerInvariant()}"
+                    : $"bot_join_team {side}; bot_quota {liveCount + 1}";
+                Log($"[SimulationMode] Reconcile: adding a bot on {side} for slot {slotId} (live={liveCount}, bot_quota={quota}): {cmd}");
+                Server.ExecuteCommand(cmd);
+            });
+        }
+
+        float followUp = missingSlots.Count * 1.0f + 5.0f;
+        AddTimer(followUp, () => ReconcileSimulationRoster("after adding bots", forceReady));
+    }
+
+    private void StopSimulationWatchdog()
+    {
+        simulationWatchdogTimer?.Kill();
+        simulationWatchdogTimer = null;
+    }
+
+    /// <summary>
+    /// Starts the warmup watchdog for this map. It checks every 10s and, once the simulated match
+    /// has been in warmup for <see cref="SimulationRosterLogic.WarmupWatchdogSeconds"/> real seconds,
+    /// reconciles the roster and force-readies. It measures wall-clock time because game timers
+    /// run faster under host_timescale. If reconciling twice has not got the match live, it
+    /// force-starts like css_start.
+    /// </summary>
+    private void StartSimulationWatchdog()
+    {
+        StopSimulationWatchdog();
+        simulationWarmupStartedUtc = DateTime.UtcNow;
+        simulationWatchdogAttempts = 0;
+        simulationWatchdogTimer = AddTimer(10.0f, SimulationWatchdogTick, TimerFlags.REPEAT);
+    }
+
+    private void SimulationWatchdogTick()
+    {
+        if (!isSimulationMode || matchStarted || !readyAvailable)
+        {
+            StopSimulationWatchdog();
+            return;
+        }
+
+        double seconds = (DateTime.UtcNow - simulationWarmupStartedUtc).TotalSeconds;
+        if (!SimulationRosterLogic.ShouldWatchdogReconcile(isSimulationMode, isMatchSetup, readyAvailable, matchStarted, seconds))
+        {
+            return;
+        }
+
+        simulationWatchdogAttempts++;
+        Log($"[SimulationMode] Watchdog: still in warmup after {seconds:0}s (attempt {simulationWatchdogAttempts}); reconciling roster and force-readying.");
+        simulationWarmupStartedUtc = DateTime.UtcNow;
+
+        ReconcileSimulationRoster("watchdog", forceReady: true);
+
+        if (!matchStarted && readyAvailable && simulationWatchdogAttempts >= SimulationRosterLogic.WatchdogForceStartAfterAttempts)
+        {
+            Log("[SimulationMode] Watchdog: reconcile did not get the match live; force-starting (same as css_start).");
+            HandleMatchStart(allowAutoReadySimulationWithoutHumans: true);
+        }
+    }
+
+    /// <summary>
+    /// mp_warmup_end is what MAT's "end warmup" sends. On its own it only ends the engine warmup
+    /// while the plugin keeps waiting for ready players. In a simulated match, reconcile the
+    /// roster, force-ready the bots and start the match through the normal start path instead.
+    /// </summary>
+    private HookResult OnWarmupEndCommand(CCSPlayerController? player, CommandInfo info)
+    {
+        if (!SimulationRosterLogic.ShouldInterceptWarmupEnd(isSimulationMode, isMatchSetup, readyAvailable, matchStarted, handleMatchStartInProgress))
+        {
+            return HookResult.Continue;
+        }
+
+        Log("[SimulationMode] mp_warmup_end received during simulated warmup; reconciling roster and starting the match.");
+        ReconcileSimulationRoster("mp_warmup_end", forceReady: true);
+        if (!matchStarted && readyAvailable)
+        {
+            HandleMatchStart(allowAutoReadySimulationWithoutHumans: true);
+        }
+        // The start path issues its own mp_warmup_end once flags are set.
+        return HookResult.Stop;
     }
 
     /// <summary>
@@ -286,19 +592,20 @@ public partial class MatchZy
 
             Log($"[SimulationMode] Observed bot '{bot.PlayerName}' (UserId={userId}, TeamNum={bot.TeamNum}, Connected={bot.Connected}).");
 
-            // Make sure our core player tracking sees this bot.
-            if (!playerData.ContainsKey(userId))
+            // Make sure our core player tracking holds *this* controller. The UserId may be a
+            // reused one whose old controller is still remembered (QA match 64: "Delayed ready:
+            // bot UserId=12 no longer valid" and team2 stuck at 4 of 5), so always overwrite and
+            // reset the ready state unless it is the same live controller.
+            bool sameController = playerData.TryGetValue(userId, out var knownController)
+                && IsPlayerValid(knownController) && knownController!.Handle == bot.Handle;
+            if (!sameController && playerData.ContainsKey(userId))
             {
-                playerData[userId] = bot;
-
-                if (readyAvailable && !matchStarted)
-                {
-                    playerReadyStatus[userId] = false;
-                }
-                else
-                {
-                    playerReadyStatus[userId] = true;
-                }
+                Log($"[SimulationMode] Replacing stale tracked controller for UserId={userId} with bot '{bot.PlayerName}'.");
+            }
+            playerData[userId] = bot;
+            if (!sameController || !playerReadyStatus.ContainsKey(userId))
+            {
+                playerReadyStatus[userId] = !(readyAvailable && !matchStarted);
             }
 
             // Ensure a simulation identity is assigned.
@@ -347,23 +654,29 @@ public partial class MatchZy
                     {
                         // Random delay between 1.5 and 3.5 seconds to simulate realistic ready-up times
                         float readyDelay = 1.5f + (new Random().Next(0, 200) / 100.0f);
-                        
+                        string slotSteamId = identity.ConfigSteamId;
+
                         AddTimer(readyDelay, () =>
                         {
-                            if (!playerData.TryGetValue(userId, out var delayedBot) || !IsPlayerValid(delayedBot))
-                            {
-                                Log($"[SimulationMode] Delayed ready: bot UserId={userId} no longer valid.");
-                                return;
-                            }
-
                             if (!readyAvailable || matchStarted)
                             {
                                 Log($"[SimulationMode] Delayed ready: match already started or ready system disabled for UserId={userId}.");
                                 return;
                             }
 
-                            playerReadyStatus[userId] = true;
-                            Log($"[SimulationMode] Marking sim bot UserId={userId} as ready after {readyDelay:0.1f}s delay.");
+                            // Resolve the bot by roster slot at fire time, not by the UserId captured earlier.
+                            var delayedBot = FindSimulationBotForSlot(slotSteamId);
+                            if (delayedBot == null)
+                            {
+                                Log($"[SimulationMode] Delayed ready: no connected bot holds slot {slotSteamId} (was UserId={userId}); requesting reconcile.");
+                                RequestSimulationReconcile("delayed ready found no bot");
+                                return;
+                            }
+
+                            int currentUserId = delayedBot.UserId!.Value;
+                            playerData[currentUserId] = delayedBot;
+                            playerReadyStatus[currentUserId] = true;
+                            Log($"[SimulationMode] Marking sim bot UserId={currentUserId} as ready after {readyDelay:0.0}s delay.");
 
                             SendPlayerReadyEvent(delayedBot, true);
                             CheckAndSendTeamReadyEvent();
@@ -427,6 +740,7 @@ public partial class MatchZy
         }
 
         userIds.Sort();
+        simulationReadyFlowRan = true;
 
         Log($"[SimulationMode] Starting simulated ready flow for {userIds.Count} mapped players.");
 
@@ -435,20 +749,22 @@ public partial class MatchZy
         {
             int userId = userIds[i];
             float delay = i * delayStep;
+            if (!simulationPlayersByUserId.TryGetValue(userId, out var slotIdentity)) continue;
 
             AddTimer(delay, () =>
             {
-                if (!playerData.TryGetValue(userId, out var player) || !IsPlayerValid(player))
+                // Resolve by roster slot at fire time: the UserId may have been freed or reused.
+                var player = FindSimulationBotForSlot(slotIdentity.ConfigSteamId);
+                if (player == null)
                 {
-                    Log($"[SimulationMode] Simulated ready: playerData missing or invalid for UserId={userId}.");
+                    Log($"[SimulationMode] Simulated ready: no connected bot holds slot {slotIdentity.ConfigName} ({slotIdentity.ConfigSteamId}, was UserId={userId}); requesting reconcile.");
+                    RequestSimulationReconcile("simulated ready found no bot");
                     return;
                 }
 
-                SimulationPlayerIdentity? identity = null;
-                simulationPlayersByUserId.TryGetValue(userId, out identity);
-                string effectiveSteamId = identity?.ConfigSteamId ?? player.SteamID.ToString();
-                string effectiveName = identity?.ConfigName ?? player.PlayerName;
-                Log($"[SimulationMode] Simulating !ready for UserId={userId}, SteamId={effectiveSteamId}, Name={effectiveName}.");
+                int currentUserId = player.UserId!.Value;
+                playerData[currentUserId] = player;
+                Log($"[SimulationMode] Simulating !ready for UserId={currentUserId}, SteamId={slotIdentity.ConfigSteamId}, Name={slotIdentity.ConfigName}.");
 
                 // Mimic the !ready command, which will:
                 // - Mark the player as ready
@@ -474,6 +790,12 @@ public partial class MatchZy
             // match can start even if the CT/T player counts are not perfectly
             // balanced (e.g. 1 CT + 9 T bots).
             CheckLiveRequired();
+
+            // Any slot still without a connected bot gets filled now rather than waiting for the watchdog.
+            if (!matchStarted && readyAvailable && simulationPlayersByUserId.Count < simulationIdentityPool.Count)
+            {
+                RequestSimulationReconcile("ready flow finished with unmapped slots");
+            }
         });
     }
 
@@ -655,8 +977,23 @@ public partial class MatchZy
         // so that we can spawn exactly one bot per configured player.
         ClearExistingBotsForSimulation();
 
+        // Drop tracked controllers that no longer exist (e.g. bots that left on the map change
+        // without a usable disconnect event), so a new bot reusing the UserId is tracked fresh.
+        foreach (var staleUserId in new List<int>(playerData.Keys))
+        {
+            var tracked = playerData[staleUserId];
+            if (tracked == null || !tracked.IsValid || tracked.Connected != PlayerConnectedState.PlayerConnected)
+            {
+                playerData.Remove(staleUserId);
+                playerReadyStatus.Remove(staleUserId);
+                Log($"[SimulationMode] Pruned stale tracked player UserId={staleUserId} before spawning bots.");
+            }
+        }
+
         // Prepare the configured identities that bots will represent.
         BuildSimulationConfigPlayers();
+        simulationReadyFlowRan = false;
+        StartSimulationWatchdog();
 
         // Spawn one bot per configured player. The simulated ready flow will be
         // scheduled from AssignSimulationIdentityForBot once bots begin to connect.

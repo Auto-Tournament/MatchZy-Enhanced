@@ -575,7 +575,17 @@ namespace MatchZy
             string currentMapName = Server.MapName;
             string mapName = matchConfig.Maplist[0];
 
-            bool willChangeMap = IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapName;
+            // After a server restart the server can already be on the match map with no SourceTV
+            // master (created only on map load with tv_enable 1). Without a reload tv_record then
+            // writes nothing and the first match's demo is lost (QA: match 62, file_not_found).
+            bool sourceTvReloadRequired = DemoFileLocator.RequiresMapReloadForSourceTv(isDemoRecordingEnabled, IsSourceTvActive());
+            if (sourceTvReloadRequired)
+            {
+                Log("[LoadMatch] Demo recording is enabled but no SourceTV master is running; forcing tv_enable 1 and reloading the map so demos are recorded.");
+                Server.ExecuteCommand("tv_enable 1");
+            }
+
+            bool willChangeMap = IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapName || sourceTvReloadRequired;
 
             if (willChangeMap)
             {

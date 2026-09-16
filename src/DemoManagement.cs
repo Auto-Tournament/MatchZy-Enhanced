@@ -21,6 +21,30 @@ namespace MatchZy
         public string activeDemoFile = "";
 
         public bool isDemoRecording = false;
+
+        // When the current tv_record was issued; bounds the fallback demo search so an older
+        // demo of the same match id is never uploaded instead.
+        private DateTime? demoRecordingStartedUtc = null;
+
+        /// <summary>
+        /// True when a SourceTV master exists. It is only created on map load with tv_enable 1;
+        /// without it tv_record prints "Only TV Master can record demos instantly." and writes nothing.
+        /// </summary>
+        private bool IsSourceTvActive()
+        {
+            try
+            {
+                foreach (var controller in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
+                {
+                    if (controller != null && controller.IsValid && controller.IsHLTV) return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[IsSourceTvActive] Failed to inspect controllers: {ex.Message}");
+            }
+            return false;
+        }
         public bool isDemoRecordingEnabled = true;
         
         // Track if demoUploadURL was set dynamically (via API/web panel) to prevent config file from overwriting it
@@ -68,14 +92,21 @@ namespace MatchZy
             string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
             try
             {
-                string? directoryPath = Path.GetDirectoryName(Path.Join(Server.GameDirectory + "/csgo/", demoPath));
-                if (directoryPath != null)
+                // Make sure the target directory exists before tv_record (fresh servers have no MatchZy/ yet).
+                string directoryPath = Path.Join(Server.GameDirectory + "/csgo/", DemoFileLocator.NormalizeDemoPath(demoPath));
+                if (!Directory.Exists(directoryPath))
                 {
-                    if (!Directory.Exists(directoryPath))
-                    {
-                        Directory.CreateDirectory(directoryPath);
-                        Log($"[StartDemoRecording] Created demo directory: {directoryPath}");
-                    }
+                    Directory.CreateDirectory(directoryPath);
+                    Log($"[StartDemoRecording] Created demo directory: {directoryPath}");
+                }
+
+                bool sourceTvActive = IsSourceTvActive();
+                if (!sourceTvActive)
+                {
+                    // Nothing we can do mid-match without a map reload; LoadMatch reloads the map for
+                    // this case. Log loudly so a missing demo is explained in the server log.
+                    Log("[StartDemoRecording] WARNING: no SourceTV master is running (it is only created on map load with tv_enable 1). tv_record will not write a demo.");
+                    Log($"[DEMO_RECORDING] NO_SOURCETV file=\"{demoFileName}\"");
                 }
                 string tempDemoPath = demoPath == "" ? demoFileName : demoPath + demoFileName;
                 activeDemoFile = tempDemoPath;
@@ -88,7 +119,8 @@ namespace MatchZy
                 Log($"[DEMO_RECORDING] START file=\"{demoFileName}\" rel=\"{tempDemoPath}\" gotv={(tvEnable ? 1 : 0)}");
                 Server.ExecuteCommand($"tv_record {tempDemoPath}");
                 isDemoRecording = true;
-                Log($"[StartDemoRecording] Demo recording started successfully.");
+                demoRecordingStartedUtc = DateTime.UtcNow;
+                Log($"[StartDemoRecording] Demo recording started{(sourceTvActive ? " successfully" : " (SourceTV missing, demo likely not written)")}.");
 
                 // Emit structured event for MAT admin event viewer (best-effort).
                 // This will be queued for retry automatically if MAT is temporarily unreachable.
@@ -112,6 +144,7 @@ namespace MatchZy
                 // This is to avoid demo loss in any case of exception
                 Server.ExecuteCommand($"tv_record {demoFileName}");
                 isDemoRecording = true;
+                demoRecordingStartedUtc = DateTime.UtcNow;
                 Log($"[DEMO_RECORDING] START_FALLBACK file=\"{demoFileName}\"");
 
                 _ = Task.Run(async () =>
@@ -135,6 +168,9 @@ namespace MatchZy
         {
             Log($"[StopDemoRecording] Going to stop demorecording in {delay}s");
             string demoPath = Path.Join(Server.GameDirectory + "/csgo/", activeDemoFile);
+            // Captured now: by the time the upload runs the next map may already be loaded.
+            string mapName = Server.MapName;
+            DateTime? recordingStartedUtc = demoRecordingStartedUtc;
             (int t1score, int t2score) = GetTeamsScore();
             int roundNumber = t1score + t2score;
             Log($"[StopDemoRecording] Demo info - MatchId: {liveMatchId}, MapNumber: {currentMapNumber}, Rounds: {roundNumber}");
@@ -176,12 +212,48 @@ namespace MatchZy
                         PrintToAllChat($"{ChatColors.Grey}Uploading demo to API...{ChatColors.Default}");
                         Log($"[DEMO_UPLOAD] QUEUED matchId={liveMatchId} map={currentMapNumber} round={roundNumber} file=\"{Path.GetFileName(demoPath)}\"");
                     }
+                    string csgoDirectory = Server.GameDirectory + "/csgo";
+                    var searchDirs = DemoFileLocator.CandidateDirectories(csgoDirectory, demoPath, this.demoPath);
+                    // Allow some clock/flush slack before the recording start.
+                    DateTime? notBefore = recordingStartedUtc?.AddMinutes(-2);
                     _ = Task.Run(async () =>
                     {
-                        await UploadFileAsync(demoPath, demoUploadURL, demoUploadHeaderKey, demoUploadHeaderValue, liveMatchId, currentMapNumber, roundNumber);
+                        string uploadPath = ResolveDemoFileForUpload(demoPath, searchDirs, liveMatchId, mapName, notBefore);
+                        await UploadFileAsync(uploadPath, demoUploadURL, demoUploadHeaderKey, demoUploadHeaderValue, liveMatchId, currentMapNumber, roundNumber);
                     });
                 });
             });
+        }
+
+        /// <summary>
+        /// Returns the demo file to upload: the expected path, or the match's demo found by searching
+        /// the demo directories when the expected file is missing. Runs off the game thread (file IO only).
+        /// </summary>
+        private string ResolveDemoFileForUpload(string expectedPath, IReadOnlyList<string> searchDirs, long matchId, string mapName, DateTime? notBeforeUtc)
+        {
+            string? resolved = DemoFileLocator.Resolve(
+                expectedPath,
+                searchDirs,
+                matchId,
+                mapName,
+                notBeforeUtc,
+                File.Exists,
+                dir => Directory.Exists(dir)
+                    ? new DirectoryInfo(dir).EnumerateFiles("*.dem", SearchOption.TopDirectoryOnly)
+                        .Select(f => new DemoFileCandidate(f.FullName, f.LastWriteTimeUtc))
+                    : Enumerable.Empty<DemoFileCandidate>(),
+                msg => Log($"[DEMO_UPLOAD] RESOLVE matchId={matchId} {msg}"));
+
+            if (resolved == null)
+            {
+                Log($"[DEMO_UPLOAD] RESOLVE matchId={matchId} no demo found in: {string.Join(", ", searchDirs)}");
+                return expectedPath;
+            }
+            if (resolved != expectedPath)
+            {
+                Log($"[DEMO_UPLOAD] RESOLVE matchId={matchId} expected file missing, uploading found demo {resolved}");
+            }
+            return resolved;
         }
 
         public int GetTvDelay()
