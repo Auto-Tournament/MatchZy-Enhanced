@@ -8,13 +8,20 @@
 
   <ItemGroup>
     <!-- Only the dependency-free rules are compiled in; the plugin itself needs the
-         CounterStrikeSharp runtime and cannot be loaded outside a game server. -->
+         CounterStrikeSharp runtime and cannot be loaded outside a game server.
+         ServerIdentity is pure, and PersistentConfigStore needs only IDbConnection + Dapper,
+         so the schema migration can be exercised against a real SQLite database here. -->
     <Compile Include="..\..\src\MatchLogic.cs" Link="MatchLogic.cs" />
+    <Compile Include="..\..\src\ServerIdentity.cs" Link="ServerIdentity.cs" />
+    <Compile Include="..\..\src\PersistentConfigStore.cs" Link="PersistentConfigStore.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Dapper" Version="2.1.15" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.13" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.6" />
   </ItemGroup>
 </Project>

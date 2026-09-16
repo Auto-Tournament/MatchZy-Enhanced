@@ -3719,6 +3719,69 @@ namespace MatchZy
         }
 
         /// <summary>
+        /// Resolves the identity that scopes this server's rows in the MatchZy database.
+        ///
+        /// Called lazily on the first config read or write, which happens in LoadPersistentConfig,
+        /// i.e. after config.cfg has been executed. That ordering matters: an operator setting
+        /// matchzy_config_scope in config.cfg must be visible here, and it cannot come from the
+        /// database, because it is what decides which rows the database hands back.
+        ///
+        /// The result is cached by Database for the life of the process, so the scope never
+        /// changes mid-session.
+        /// </summary>
+        private string ResolveServerConfigScope()
+        {
+            string? explicitScope = null;
+            try
+            {
+                explicitScope = configScopeOverride?.Value;
+            }
+            catch { /* fall through to the derived scope */ }
+
+            string[]? commandLineArgs = null;
+            try
+            {
+                commandLineArgs = Environment.GetCommandLineArgs();
+            }
+            catch { /* fall through to the convars */ }
+
+            string? convarBindIp = null;
+            try
+            {
+                convarBindIp = ConVar.Find("ip")?.StringValue;
+            }
+            catch { /* the convar is optional */ }
+
+            int? convarGamePort = null;
+            try
+            {
+                var hostPort = ConVar.Find("hostport");
+                if (hostPort != null) convarGamePort = hostPort.GetPrimitiveValue<int>();
+            }
+            catch { /* the convar is optional */ }
+
+            string? machineName = null;
+            try
+            {
+                machineName = Environment.MachineName;
+            }
+            catch { /* falls back to ServerIdentity.UnknownHost */ }
+
+            string scope = ServerIdentity.Resolve(explicitScope, commandLineArgs, convarBindIp, convarGamePort, machineName);
+
+            if (!string.IsNullOrWhiteSpace(explicitScope))
+            {
+                Log($"[ServerIdentity] Persistent config scope (from matchzy_config_scope): {scope}");
+            }
+            else
+            {
+                Log($"[ServerIdentity] Persistent config scope (derived from bind address and game port): {scope}");
+            }
+
+            return scope;
+        }
+
+        /// <summary>
         /// Loads persistent configuration from database.
         /// These values override config.cfg and survive server restarts.
         /// </summary>
