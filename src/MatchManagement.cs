@@ -463,6 +463,8 @@ namespace MatchZy
 
             // Update tournament status to loading with match ID
             UpdateTournamentStatus("loading", liveMatchId.ToString());
+            // A new match starts from the operator's restart delay, not a previous match's GOTV raise.
+            RestoreMatchRestartDelay("match load");
             JToken team1 = jsonDataObject["team1"]!;
             JToken team2 = jsonDataObject["team2"]!;
             JToken maplist = jsonDataObject["maplist"]!;
