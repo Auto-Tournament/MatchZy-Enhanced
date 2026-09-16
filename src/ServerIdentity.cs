@@ -1,44 +1,110 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MatchZy;
+
+/// <summary>Where a server's config scope came from, in preference order.</summary>
+public enum ScopeSource
+{
+    /// <summary><c>+matchzy_config_scope &lt;name&gt;</c> in the game process's start arguments.</summary>
+    StartArgument,
+
+    /// <summary>The <c>matchzy_config_scope</c> convar (e.g. from config.cfg).</summary>
+    Convar,
+
+    /// <summary><c>-port &lt;n&gt;</c> in the game process's start arguments.</summary>
+    CommandLinePort,
+
+    /// <summary>The <c>hostport</c> convar, read after the server has activated.</summary>
+    HostportConvar,
+
+    /// <summary>
+    /// No explicit scope and no known port: the host plus a hash of the server's install path.
+    /// Distinct per install, but a warning is always logged.
+    /// </summary>
+    InstallPathFallback,
+
+    /// <summary>
+    /// Not even an install path: the host plus the process id. Never shared with another
+    /// server, but does not survive a restart. A warning is always logged.
+    /// </summary>
+    ProcessFallback,
+}
+
+/// <summary>A resolved scope, where it came from, and whether it may be cached for the process.</summary>
+public sealed record ScopeResolution(string Scope, ScopeSource Source, bool IsFinal)
+{
+    /// <summary>True when the scope came from neither an explicit name nor a real port.</summary>
+    public bool IsFallback => Source is ScopeSource.InstallPathFallback or ScopeSource.ProcessFallback;
+
+    public string Description => Source switch
+    {
+        ScopeSource.StartArgument => "from start argument",
+        ScopeSource.Convar => "from matchzy_config_scope convar",
+        ScopeSource.CommandLinePort => "from -port start argument",
+        ScopeSource.HostportConvar => "from hostport convar",
+        ScopeSource.InstallPathFallback => "FALLBACK from install path - no matchzy_config_scope and no game port found",
+        ScopeSource.ProcessFallback => "FALLBACK from process id - no matchzy_config_scope, no game port and no install path found; config will not survive a restart",
+        _ => Source.ToString(),
+    };
+}
+
+/// <summary>Everything the plugin knows about itself when the scope is resolved.</summary>
+public sealed class ScopeInputs
+{
+    /// <summary>The game process's argv, ideally from <c>/proc/self/cmdline</c>.</summary>
+    public string[]? CommandLineArgs { get; init; }
+
+    /// <summary>Current value of the <c>matchzy_config_scope</c> convar.</summary>
+    public string? ConvarScope { get; init; }
+
+    /// <summary>Current value of the <c>ip</c> convar.</summary>
+    public string? ConvarBindIp { get; init; }
+
+    /// <summary>
+    /// Current value of the <c>hostport</c> convar. Only trusted when
+    /// <see cref="ServerActivated"/> is true: before that it still holds the engine default
+    /// (27015) on every server, which is exactly how 1.4.26 collapsed all servers to one key.
+    /// </summary>
+    public int? HostportConvar { get; init; }
+
+    /// <summary>True once the server has activated (first OnMapStart, or a hot reload).</summary>
+    public bool ServerActivated { get; init; }
+
+    public string? MachineName { get; init; }
+
+    /// <summary>The server's install directory (distinct per server on a box).</summary>
+    public string? InstallPath { get; init; }
+
+    public int ProcessId { get; init; }
+}
 
 /// <summary>
 /// Derives the stable identity that scopes this server's rows in the shared database.
 ///
-/// Several MatchZy servers on one box normally share a single MySQL database (that is the
-/// point of a shared stats database), but everything in <c>matchzy_server_config</c> used to be
-/// keyed by setting name alone. Per-server values - the server id, the bootstrap URL and token,
-/// the remote log URL and its header, the demo upload URL - therefore collided: the last server
-/// to write won, and on the next restart every server loaded that one server's values.
+/// Several MatchZy servers on one box normally share a single MySQL database, but per-server
+/// values (server id, bootstrap URL and token, remote log URL and header, demo upload URL) are
+/// stored in <c>matchzy_server_config</c>, so each row carries the server's scope.
 ///
-/// The identity below is deliberately derived from things the game server already knows about
-/// itself, so it works before any external manager (MAT, a control panel, a deploy script) has
-/// configured anything:
+/// Resolution order:
+///   1. <c>+matchzy_config_scope &lt;name&gt;</c> in the game process's start arguments.
+///   2. The <c>matchzy_config_scope</c> convar.
+///   3. The bind address and <c>-port</c> from the start arguments.
+///   4. The <c>hostport</c> convar, only once the server has activated.
+///   5. A fallback that is still distinct per server (install path, else process id), with a
+///      loud warning. A key that would be identical for every server on the box is never used.
 ///
-///   1. <c>matchzy_config_scope</c>, when the operator set one explicitly, either as a convar or
-///      as <c>+matchzy_config_scope &lt;name&gt;</c> in the server's start arguments. This is the
-///      escape hatch, and it is never persisted to the database, because a value that decides the
-///      scope cannot itself be read from a scoped row. The start-argument form is the reliable
-///      one: config.cfg is executed through the engine command buffer and may not have run yet.
-///   2. The bind address and game port from the process command line (<c>-ip</c> / <c>-port</c>),
-///      falling back to the <c>ip</c> and <c>hostport</c> convars.
-///
-/// The bind address is usually <c>0.0.0.0</c> (CS2 servers are nearly always started that way),
-/// which cannot distinguish anything, so an unusable bind address is replaced by the machine
-/// name. That gives, for three servers on a box called "cs2", the scopes <c>cs2:27015</c>,
-/// <c>cs2:27025</c> and <c>cs2:27035</c> - stable across restarts, distinct per server on one
-/// box, distinct across boxes sharing one database, and requiring no configuration.
-///
-/// Known failure modes, all recoverable and all documented in the README:
-///   - Changing a server's game port changes its scope. The server then finds no scoped row and
-///     falls back to the legacy (unscoped) row, and an external manager re-pushes its values on
-///     the next configure. Set <c>matchzy_config_scope</c> to pin a name across port changes.
-///   - Renaming the box changes the scope of every server on it that binds to 0.0.0.0. Same
-///     recovery. Setting a real bind address, or <c>matchzy_config_scope</c>, avoids it.
-///   - Two boxes with the same machine name and the same ports, sharing one database, still
-///     collide. <c>matchzy_config_scope</c> is the fix.
+/// The start arguments are read from <c>/proc/self/cmdline</c> on Linux.
+/// <see cref="Environment.GetCommandLineArgs"/> is not usable there: CounterStrikeSharp hosts
+/// .NET inside the cs2 process through hostfxr, so the runtime never sees the game's argv. That
+/// is why 1.4.26 found neither <c>-port</c> nor <c>+matchzy_config_scope</c> and resolved every
+/// server to <c>&lt;host&gt;:27015</c>. On Windows the managed args come from the process command
+/// line, so they are used as the fallback there.
 /// </summary>
 public static class ServerIdentity
 {
@@ -48,11 +114,10 @@ public static class ServerIdentity
     /// </summary>
     public const string LegacyScope = "";
 
-    /// <summary>Port assumed when neither the command line nor the convars give one.</summary>
-    public const int DefaultGamePort = 27015;
-
     /// <summary>Stand-in host component when neither a bind address nor a machine name is usable.</summary>
     public const string UnknownHost = "unknown-host";
+
+    public const string ProcSelfCmdline = "/proc/self/cmdline";
 
     /// <summary>
     /// Maximum scope length. Kept well inside the <c>VARCHAR(190)</c> column so a scope is never
@@ -72,62 +137,75 @@ public static class ServerIdentity
     /// <summary>Command line flags that carry the bind address.</summary>
     private static readonly string[] IpFlags = { "-ip", "+ip" };
 
-    /// <summary>
-    /// Command line flags that carry an explicit scope override. Reading the override from the
-    /// command line as well as the convar matters because <c>execifexists MatchZy/config.cfg</c>
-    /// goes through the engine command buffer and may not have run by the time the scope is first
-    /// needed - <c>+matchzy_config_scope &lt;name&gt;</c> in the server's start arguments always has.
-    /// </summary>
+    /// <summary>Command line flags that carry an explicit scope override.</summary>
     private static readonly string[] ScopeFlags = { "+matchzy_config_scope", "-matchzy_config_scope" };
 
     /// <summary>
-    /// Full resolution, in preference order: the convar override, the command line override, then
-    /// the bind address and game port from the command line, then from the convars.
+    /// Full resolution, see the class summary for the order. <see cref="ScopeResolution.IsFinal"/>
+    /// is false only when the result could still improve once the server activates (no explicit
+    /// scope, no port on the command line, server not yet activated).
     /// </summary>
-    public static string Resolve(
-        string? explicitScope,
-        string[]? commandLineArgs,
-        string? convarBindIp,
-        int? convarGamePort,
-        string? machineName)
+    public static ScopeResolution Resolve(ScopeInputs inputs)
     {
-        string? scopeOverride = !string.IsNullOrWhiteSpace(explicitScope)
-            ? explicitScope
-            : ParseScopeOverride(commandLineArgs);
+        string[]? args = inputs.CommandLineArgs;
 
-        if (!string.IsNullOrWhiteSpace(scopeOverride))
+        string? startArgScope = ParseScopeOverride(args);
+        if (startArgScope != null)
         {
-            return Sanitize(scopeOverride!);
+            return new ScopeResolution(Sanitize(startArgScope), ScopeSource.StartArgument, true);
         }
 
-        string? bindIp = ParseBindIp(commandLineArgs) ?? convarBindIp;
-        int? gamePort = ParseGamePort(commandLineArgs) ?? convarGamePort;
+        if (!string.IsNullOrWhiteSpace(inputs.ConvarScope))
+        {
+            return new ScopeResolution(Sanitize(inputs.ConvarScope!), ScopeSource.Convar, true);
+        }
 
-        return Derive(bindIp, gamePort, machineName);
+        string host = ResolveHost(ParseBindIp(args) ?? inputs.ConvarBindIp, inputs.MachineName);
+
+        int? commandLinePort = ParseGamePort(args);
+        if (commandLinePort.HasValue)
+        {
+            return new ScopeResolution(Derive(host, commandLinePort.Value), ScopeSource.CommandLinePort, true);
+        }
+
+        if (inputs.ServerActivated && IsUsablePort(inputs.HostportConvar))
+        {
+            return new ScopeResolution(Derive(host, inputs.HostportConvar!.Value), ScopeSource.HostportConvar, true);
+        }
+
+        if (!string.IsNullOrWhiteSpace(inputs.InstallPath))
+        {
+            return new ScopeResolution(
+                Sanitize($"{host}:path-{ShortHash(NormalisePath(inputs.InstallPath!))}"),
+                ScopeSource.InstallPathFallback,
+                inputs.ServerActivated);
+        }
+
+        return new ScopeResolution(
+            Sanitize($"{host}:pid-{inputs.ProcessId.ToString(CultureInfo.InvariantCulture)}"),
+            ScopeSource.ProcessFallback,
+            inputs.ServerActivated);
     }
 
     /// <summary>
-    /// Builds the <c>host:port</c> scope from an already-resolved bind address and port.
+    /// True when the start arguments alone identify this server (explicit scope or game port), so
+    /// persistent config can be loaded before the server activates.
     /// </summary>
-    public static string Derive(string? bindIp, int? gamePort, string? machineName)
+    public static bool HasCommandLineIdentity(string[]? args) =>
+        ParseScopeOverride(args) != null || ParseGamePort(args).HasValue;
+
+    /// <summary>Builds the <c>host:port</c> scope from a resolved bind address or machine name.</summary>
+    public static string Derive(string? bindIp, int gamePort, string? machineName) =>
+        Derive(ResolveHost(bindIp, machineName), gamePort);
+
+    private static string Derive(string host, int gamePort) =>
+        Sanitize($"{host}:{gamePort.ToString(CultureInfo.InvariantCulture)}");
+
+    private static string ResolveHost(string? bindIp, string? machineName)
     {
-        string host;
-        if (IsUsableHost(bindIp))
-        {
-            host = bindIp!.Trim();
-        }
-        else if (!string.IsNullOrWhiteSpace(machineName))
-        {
-            host = machineName!.Trim();
-        }
-        else
-        {
-            host = UnknownHost;
-        }
-
-        int port = IsUsablePort(gamePort) ? gamePort!.Value : DefaultGamePort;
-
-        return Sanitize($"{host}:{port.ToString(CultureInfo.InvariantCulture)}");
+        if (IsUsableHost(bindIp)) return bindIp!.Trim();
+        if (!string.IsNullOrWhiteSpace(machineName)) return machineName!.Trim();
+        return UnknownHost;
     }
 
     /// <summary>
@@ -136,43 +214,80 @@ public static class ServerIdentity
     public static bool IsUsableHost(string? host)
     {
         if (string.IsNullOrWhiteSpace(host)) return false;
-        string trimmed = host!.Trim();
-        return !UnusableHosts.Contains(trimmed, StringComparer.OrdinalIgnoreCase);
+        return !UnusableHosts.Contains(host!.Trim(), StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>True when a port is in the valid range.</summary>
     public static bool IsUsablePort(int? port) => port.HasValue && port.Value > 0 && port.Value <= 65535;
 
     /// <summary>
-    /// Reads the game port from the process command line, e.g.
-    /// <c>... -dedicated -ip 0.0.0.0 +map de_dust2 -port 27025 +tv_port 27030 ...</c> gives 27025.
+    /// Reads the game process's argv. On Linux this is <c>/proc/self/cmdline</c>, the only
+    /// source that has the game's arguments when .NET is hosted inside cs2. Elsewhere, or if that
+    /// fails, <see cref="Environment.GetCommandLineArgs"/>.
+    /// </summary>
+    public static (string[]? Args, string Source) ReadProcessCommandLine()
+    {
+        try
+        {
+            if (File.Exists(ProcSelfCmdline))
+            {
+                string[] args = ParseProcCmdline(File.ReadAllBytes(ProcSelfCmdline));
+                if (args.Length > 0) return (args, ProcSelfCmdline);
+            }
+        }
+        catch
+        {
+            // fall through to the managed args
+        }
+
+        try
+        {
+            return (Environment.GetCommandLineArgs(), "Environment.GetCommandLineArgs()");
+        }
+        catch
+        {
+            return (null, "unavailable");
+        }
+    }
+
+    /// <summary>
+    /// Splits the raw bytes of <c>/proc/&lt;pid&gt;/cmdline</c> (NUL-terminated UTF-8 arguments)
+    /// into argv.
+    /// </summary>
+    public static string[] ParseProcCmdline(byte[]? raw)
+    {
+        if (raw == null || raw.Length == 0) return Array.Empty<string>();
+
+        string text = Encoding.UTF8.GetString(raw);
+        List<string> args = text.Split('\0').ToList();
+
+        // The buffer ends with a NUL, which leaves one empty trailing element.
+        while (args.Count > 0 && args[args.Count - 1].Length == 0)
+        {
+            args.RemoveAt(args.Count - 1);
+        }
+
+        return args.ToArray();
+    }
+
+    /// <summary>
+    /// Reads the game port, e.g. <c>... -port 27025 +tv_port 27030 ...</c> gives 27025.
     /// Returns null when no port flag is present or its value is not a valid port.
     /// </summary>
     public static int? ParseGamePort(string[]? args) =>
-        int.TryParse(ValueAfterFlag(args, PortFlags), NumberStyles.Integer, CultureInfo.InvariantCulture, out int port)
+        int.TryParse(ValueOfFlag(args, PortFlags), NumberStyles.None, CultureInfo.InvariantCulture, out int port)
         && IsUsablePort(port)
             ? port
             : null;
 
-    /// <summary>
-    /// Reads the bind address from the process command line (<c>-ip &lt;addr&gt;</c>).
-    /// Returns null when no address flag is present.
-    /// </summary>
-    public static string? ParseBindIp(string[]? args)
-    {
-        string? value = ValueAfterFlag(args, IpFlags);
-        return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
-    }
+    /// <summary>Reads the bind address (<c>-ip &lt;addr&gt;</c>). Null when absent.</summary>
+    public static string? ParseBindIp(string[]? args) => ValueOfFlag(args, IpFlags);
 
     /// <summary>
-    /// Reads an explicit scope override from the process command line
-    /// (<c>+matchzy_config_scope &lt;name&gt;</c>). Returns null when none is present.
+    /// Reads an explicit scope override (<c>+matchzy_config_scope &lt;name&gt;</c> or
+    /// <c>+matchzy_config_scope=&lt;name&gt;</c>). Null when absent or empty.
     /// </summary>
-    public static string? ParseScopeOverride(string[]? args)
-    {
-        string? value = ValueAfterFlag(args, ScopeFlags);
-        return string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
-    }
+    public static string? ParseScopeOverride(string[]? args) => ValueOfFlag(args, ScopeFlags);
 
     /// <summary>
     /// Normalises a scope so the same server always produces byte-identical rows: trimmed,
@@ -182,13 +297,12 @@ public static class ServerIdentity
     {
         if (string.IsNullOrWhiteSpace(raw)) return UnknownHost;
 
-        string value = raw.Trim().ToLowerInvariant();
-        char[] chars = value.ToCharArray();
+        char[] chars = raw.Trim().ToLowerInvariant().ToCharArray();
         for (int i = 0; i < chars.Length; i++)
         {
             if (char.IsWhiteSpace(chars[i])) chars[i] = '-';
         }
-        value = new string(chars);
+        string value = new string(chars);
 
         if (value.Length > MaxScopeLength)
         {
@@ -199,25 +313,50 @@ public static class ServerIdentity
     }
 
     /// <summary>
-    /// Returns the argument following the first of <paramref name="flags"/> found in
-    /// <paramref name="args"/>. Flags are matched whole, so <c>+tv_port</c> never matches
-    /// <c>-port</c>.
+    /// Returns the value of the first of <paramref name="flags"/> present, as either
+    /// <c>flag value</c> or <c>flag=value</c>. Flags are matched whole, so <c>+tv_port</c> never
+    /// matches <c>-port</c>. The argument after a flag is not taken as its value when it is
+    /// itself a flag (starts with '+' or '-'), so <c>+matchzy_config_scope +map de_dust2</c> has
+    /// no scope rather than the scope "+map". Index 0 (the executable) is never a flag.
     /// </summary>
-    private static string? ValueAfterFlag(string[]? args, string[] flags)
+    private static string? ValueOfFlag(string[]? args, string[] flags)
     {
         if (args == null) return null;
 
-        for (int i = 0; i < args.Length - 1; i++)
+        for (int i = 1; i < args.Length; i++)
         {
-            string arg = args[i];
-            if (string.IsNullOrEmpty(arg)) continue;
-            if (flags.Contains(arg, StringComparer.OrdinalIgnoreCase))
+            string arg = args[i]?.Trim() ?? "";
+            if (arg.Length == 0) continue;
+
+            foreach (string flag in flags)
             {
-                string next = args[i + 1];
-                if (!string.IsNullOrWhiteSpace(next)) return next;
+                if (arg.Equals(flag, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (i + 1 >= args.Length) break;
+                    string next = args[i + 1]?.Trim() ?? "";
+                    if (next.Length == 0 || next[0] == '+' || next[0] == '-') break;
+                    return next;
+                }
+
+                if (arg.Length > flag.Length + 1
+                    && arg.StartsWith(flag, StringComparison.OrdinalIgnoreCase)
+                    && arg[flag.Length] == '=')
+                {
+                    string value = arg.Substring(flag.Length + 1).Trim();
+                    if (value.Length > 0) return value;
+                }
             }
         }
 
         return null;
+    }
+
+    private static string NormalisePath(string path) =>
+        path.Trim().Replace('\\', '/').TrimEnd('/');
+
+    private static string ShortHash(string value)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(hash, 0, 5).ToLowerInvariant();
     }
 }

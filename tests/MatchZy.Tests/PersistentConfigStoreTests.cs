@@ -230,6 +230,31 @@ public class PersistentConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void RowsWrittenBy1426UnderTheSharedHostKeyAreNeverReadByAnotherScope()
+    {
+        EnsureSchema();
+
+        // Pre-migration shared row, then 1.4.26 on three servers all writing under cs2:27015.
+        connection.Execute(
+            "INSERT INTO matchzy_server_config (server_scope, config_key, config_value) VALUES ('', 'matchzy_server_id', 'legacy')");
+        Save("matchzy_server_id", "s_1", "cs2:27015");
+        Save("matchzy_server_id", "s_2", "cs2:27015");
+        Save("matchzy_server_id", "s_3", "cs2:27015");
+
+        // After the fix each server resolves its own scope from +matchzy_config_scope. Before it
+        // has written, it falls back to the legacy row only - never to another scope's row.
+        Assert.Equal("legacy", Load("matchzy_server_id", "cs2-server-1"));
+        Assert.Equal("legacy", Load("matchzy_server_id", "cs2-server-2"));
+
+        Save("matchzy_server_id", "s_2", "cs2-server-2");
+        Assert.Equal("s_2", Load("matchzy_server_id", "cs2-server-2"));
+        Assert.Equal("legacy", Load("matchzy_server_id", "cs2-server-1"));
+
+        // The stale shared row is left in place, untouched.
+        Assert.Equal("s_3", Load("matchzy_server_id", "cs2:27015"));
+    }
+
+    [Fact]
     public void OneServerPerDatabaseStillBehavesExactlyAsBefore()
     {
         EnsureSchema();

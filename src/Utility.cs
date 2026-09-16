@@ -3718,32 +3718,35 @@ namespace MatchZy
             return regex.Replace(input, "");
         }
 
+        /// <summary>The game process's argv, read once in Load (see ServerIdentity.ReadProcessCommandLine).</summary>
+        private string[]? processCommandLineArgs;
+
+        /// <summary>True once the server has activated (first OnMapStart, or a hot reload).</summary>
+        private bool serverActivated;
+
+        /// <summary>
+        /// True when Load could not identify this server from its start arguments, so loading
+        /// persistent config waits for the first OnMapStart (config.cfg and hostport are applied by then).
+        /// </summary>
+        private bool persistentConfigLoadPending;
+
+        private string? lastLoggedConfigScope;
+
         /// <summary>
         /// Resolves the identity that scopes this server's rows in the MatchZy database.
         ///
-        /// Called lazily on the first config read or write, which happens in LoadPersistentConfig,
-        /// i.e. after config.cfg has been executed. That ordering matters: an operator setting
-        /// matchzy_config_scope in config.cfg must be visible here, and it cannot come from the
-        /// database, because it is what decides which rows the database hands back.
-        ///
-        /// The result is cached by Database for the life of the process, so the scope never
-        /// changes mid-session.
+        /// Invoked lazily by Database on the first config read or write, and again on later
+        /// accesses only while the result is provisional (see ScopeResolution.IsFinal). It cannot
+        /// come from the database, because it decides which rows the database hands back.
         /// </summary>
-        private string ResolveServerConfigScope()
+        private ScopeResolution ResolveServerConfigScope()
         {
-            string? explicitScope = null;
+            string? convarScope = null;
             try
             {
-                explicitScope = configScopeOverride?.Value;
+                convarScope = configScopeOverride?.Value;
             }
-            catch { /* fall through to the derived scope */ }
-
-            string[]? commandLineArgs = null;
-            try
-            {
-                commandLineArgs = Environment.GetCommandLineArgs();
-            }
-            catch { /* fall through to the convars */ }
+            catch { /* the convar is optional */ }
 
             string? convarBindIp = null;
             try
@@ -3752,13 +3755,28 @@ namespace MatchZy
             }
             catch { /* the convar is optional */ }
 
-            int? convarGamePort = null;
-            try
+            // Before activation hostport still holds the engine default (27015) on every server,
+            // so it is only read once the server has activated.
+            int? hostport = null;
+            if (serverActivated)
             {
-                var hostPort = ConVar.Find("hostport");
-                if (hostPort != null) convarGamePort = hostPort.GetPrimitiveValue<int>();
+                try
+                {
+                    var hostPortConVar = ConVar.Find("hostport");
+                    if (hostPortConVar != null)
+                    {
+                        try
+                        {
+                            hostport = hostPortConVar.GetPrimitiveValue<int>();
+                        }
+                        catch
+                        {
+                            if (int.TryParse(hostPortConVar.StringValue, out int parsed)) hostport = parsed;
+                        }
+                    }
+                }
+                catch { /* the convar is optional */ }
             }
-            catch { /* the convar is optional */ }
 
             string? machineName = null;
             try
@@ -3767,18 +3785,53 @@ namespace MatchZy
             }
             catch { /* falls back to ServerIdentity.UnknownHost */ }
 
-            string scope = ServerIdentity.Resolve(explicitScope, commandLineArgs, convarBindIp, convarGamePort, machineName);
-
-            if (!string.IsNullOrWhiteSpace(explicitScope))
+            string? installPath = null;
+            try
             {
-                Log($"[ServerIdentity] Persistent config scope (from matchzy_config_scope): {scope}");
+                installPath = Server.GameDirectory;
             }
-            else
+            catch { /* try the process path below */ }
+            if (string.IsNullOrWhiteSpace(installPath))
             {
-                Log($"[ServerIdentity] Persistent config scope (derived from bind address and game port): {scope}");
+                try
+                {
+                    installPath = Environment.ProcessPath;
+                }
+                catch { /* falls back to the process id */ }
             }
 
-            return scope;
+            ScopeResolution resolution = ServerIdentity.Resolve(new ScopeInputs
+            {
+                CommandLineArgs = processCommandLineArgs,
+                ConvarScope = convarScope,
+                ConvarBindIp = convarBindIp,
+                HostportConvar = hostport,
+                ServerActivated = serverActivated,
+                MachineName = machineName,
+                InstallPath = installPath,
+                ProcessId = Environment.ProcessId,
+            });
+
+            if (resolution.Scope != lastLoggedConfigScope)
+            {
+                lastLoggedConfigScope = resolution.Scope;
+                string provisional = resolution.IsFinal ? "" : "; provisional until the server activates";
+                Log($"[ConfigScope] Using scope '{resolution.Scope}' ({resolution.Description}{provisional})");
+
+                if (resolution.IsFallback && resolution.IsFinal)
+                {
+                    string warning =
+                        $"[ConfigScope] WARNING: could not identify this server for its persistent config. " +
+                        $"Neither +matchzy_config_scope nor a game port was found (install path: '{installPath ?? "unknown"}'). " +
+                        $"Add '+matchzy_config_scope <name>' to this server's start arguments so its config survives restarts and moves.";
+                    Log(warning);
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine(warning);
+                    Console.ResetColor();
+                }
+            }
+
+            return resolution;
         }
 
         /// <summary>
