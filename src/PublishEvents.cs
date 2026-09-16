@@ -10,12 +10,17 @@ namespace MatchZy
     {
         public async Task SendEventAsync(MatchZyEvent @event)
         {
+            // Log and queue the ids carried by the event itself. Events are sent from
+            // Task.Run, so matchConfig.CurrentMapNumber may already point at the next map
+            // (map_result for map 0 used to be logged as mapNumber 1).
+            long eventMatchId = @event is MatchZyMatchEvent matchEvent ? matchEvent.MatchId : liveMatchId;
+            int eventMapNumber = @event is MatchZyMapEvent mapEvent ? mapEvent.MapNumber : matchConfig.CurrentMapNumber;
             try
             {
                 if (!eventsEnabled.Value) return;
                 if (string.IsNullOrEmpty(matchConfig.RemoteLogURL)) return;
 
-                Log($"[SendEventAsync] Sending Event: {@event.EventName} for matchId: {liveMatchId} mapNumber: {matchConfig.CurrentMapNumber} on {SecretRedactor.RedactText(matchConfig.RemoteLogURL)}");
+                Log($"[SendEventAsync] Sending Event: {@event.EventName} for matchId: {eventMatchId} mapNumber: {eventMapNumber} on {SecretRedactor.RedactText(matchConfig.RemoteLogURL)}");
                 
                 // Print to server console, and optionally to chat for visibility
                 Server.NextFrame(() => {
@@ -42,7 +47,7 @@ namespace MatchZy
 
                 if (httpResponseMessage.IsSuccessStatusCode)
                 {
-                    Log($"[SendEventAsync] Sending {@event.EventName} for matchId: {liveMatchId} mapNumber: {matchConfig.CurrentMapNumber} successful with status code: {httpResponseMessage.StatusCode}");
+                    Log($"[SendEventAsync] Sending {@event.EventName} for matchId: {eventMatchId} mapNumber: {eventMapNumber} successful with status code: {httpResponseMessage.StatusCode}");
                     
                     // Print success to console, and optionally to chat
                     Server.NextFrame(() => {
@@ -57,12 +62,12 @@ namespace MatchZy
                 {
                     string errorContent = await httpResponseMessage.Content.ReadAsStringAsync();
                     string errorMsg = $"HTTP {httpResponseMessage.StatusCode}: {errorContent}";
-                    Log($"[SendEventAsync] Sending {@event.EventName} for matchId: {liveMatchId} mapNumber: {matchConfig.CurrentMapNumber} failed with status code: {httpResponseMessage.StatusCode}, ResponseContent: {SecretRedactor.RedactText(errorContent)}");
+                    Log($"[SendEventAsync] Sending {@event.EventName} for matchId: {eventMatchId} mapNumber: {eventMapNumber} failed with status code: {httpResponseMessage.StatusCode}, ResponseContent: {SecretRedactor.RedactText(errorContent)}");
                     
                     // Queue the event for retry (jsonString already contains the serialized event)
                     string eventDataForQueue = jsonString;
                     Server.NextFrame(() => {
-                        database.QueueEvent(@event.EventName, eventDataForQueue, liveMatchId, matchConfig.CurrentMapNumber, errorMsg);
+                        database.QueueEvent(@event.EventName, eventDataForQueue, eventMatchId, eventMapNumber, errorMsg);
                     });
                     
                     // Print error to console, and optionally to chat
@@ -86,7 +91,7 @@ namespace MatchZy
                 {
                     string eventDataForQueue = JsonSerializer.Serialize(@event, @event.GetType());
                     Server.NextFrame(() => {
-                        database.QueueEvent(@event.EventName, eventDataForQueue, liveMatchId, matchConfig.CurrentMapNumber, $"Exception: {e.Message}");
+                        database.QueueEvent(@event.EventName, eventDataForQueue, eventMatchId, eventMapNumber, $"Exception: {e.Message}");
                     });
                 }
                 catch (Exception queueEx)
