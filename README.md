@@ -103,8 +103,26 @@ both, set an explicit scope:
 ```
 
 `matchzy_config_scope` can also go in `config.cfg`, but the start-argument form is the one to
-prefer. It is never persisted to the database — a value that decides which rows you read cannot
-itself be read from those rows.
+prefer and wins when both are set. It is never persisted to the database — a value that decides
+which rows you read cannot itself be read from those rows.
+
+The resolved scope is logged once at startup, e.g.
+`[ConfigScope] Using scope 'cs2-server-2' (from start argument)`. The order is: the
+`+matchzy_config_scope` start argument, the `matchzy_config_scope` convar, `-port` in the start
+arguments, then the `hostport` convar once the server has activated. Start arguments are read from
+`/proc/self/cmdline` on Linux. If none of these identify the server, MatchZy uses a key derived
+from the server's install path (still distinct per server, never a key shared by the whole box)
+and logs a warning — add `+matchzy_config_scope` when you see it.
+
+**Upgrading from 1.4.26.** 1.4.26 could not read the start arguments inside the game process and
+resolved every server on a box to the same `<host>:27015` scope, so those rows hold whichever
+server wrote last. They are left in place but no longer read by any server that resolves a
+different scope (reads only ever fall back to the pre-scoping shared row, never to another
+scope). A controller re-pushes the correct values on the next configure. Once every server logs
+its own scope you can remove the stale rows, e.g.
+`DELETE FROM matchzy_server_config WHERE server_scope = 'cs2:27015';` — but only if no server on
+that box legitimately resolves to that scope (a server without `+matchzy_config_scope` on port
+27015 does).
 
 **Backwards compatibility.** Rows written before this change are kept and treated as shared
 fallbacks. A server reads its own row when it has one and the shared row otherwise, and only ever

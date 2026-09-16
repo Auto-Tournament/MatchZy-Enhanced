@@ -16,7 +16,7 @@ namespace MatchZy
         // Leave empty to derive it from the bind address and game port (see ServerIdentity).
         // This must be set in config.cfg / server.cfg and is deliberately never persisted to the
         // database: a value that decides the scope cannot itself be read from a scoped row.
-        public FakeConVar<string> configScopeOverride = new("matchzy_config_scope", "Overrides the identity used to scope this server's persistent config in a shared database. Empty (default) derives it from bind address and game port. Must be set in config.cfg, never persisted.", "");
+        public FakeConVar<string> configScopeOverride = new("matchzy_config_scope", "Overrides the identity used to scope this server's persistent config in a shared database. Empty (default) derives it from bind address and game port. Prefer the start argument +matchzy_config_scope <name>, which wins over this convar. Never persisted.", "");
 
         public FakeConVar<bool> smokeColorEnabled = new("matchzy_smoke_color_enabled", "Whether player-specific smoke color is enabled or not. Default: false", false);
         public FakeConVar<bool> techPauseEnabled = new("matchzy_enable_tech_pause", "Whether .tech command is enabled or not. Default: true", true);

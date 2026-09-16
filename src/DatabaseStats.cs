@@ -39,18 +39,22 @@ namespace MatchZy
         public string? LastHealthError { get; private set; } = null;
 
         /// <summary>
-        /// Supplies this server's identity for scoping rows in the shared database. Set by the
-        /// plugin after config.cfg has been executed, so an explicit matchzy_config_scope is
-        /// visible. Resolved lazily and cached, so the scope cannot change mid-process.
+        /// Supplies this server's identity for scoping rows in the shared database. Invoked lazily
+        /// on the first config read or write, not when it is assigned.
         /// </summary>
-        public Func<string>? ScopeProvider { get; set; }
+        public Func<ScopeResolution>? ScopeProvider { get; set; }
 
         private string? resolvedScope;
 
         /// <summary>
-        /// This server's scope, resolved once per process. Falls back to the legacy scope when no
-        /// provider is set (which only happens outside the game server), so behaviour matches the
-        /// pre-scoping plugin rather than failing.
+        /// This server's scope. A final resolution is cached for the life of the process, so the
+        /// scope never changes once it is known. A provisional one (no explicit scope and no port
+        /// on the command line, before the server has activated) is used but not cached, so the
+        /// hostport convar can still take over after OnMapStart instead of freezing a fallback.
+        ///
+        /// With no provider at all (outside the game server) this is the legacy scope, matching
+        /// the pre-scoping plugin. A provider error never degrades to the legacy scope, because
+        /// that row is shared by every server on the database.
         /// </summary>
         public string ServerScope
         {
@@ -58,21 +62,23 @@ namespace MatchZy
             {
                 if (resolvedScope != null) return resolvedScope;
 
+                if (ScopeProvider == null)
+                {
+                    resolvedScope = ServerIdentity.LegacyScope;
+                    return resolvedScope;
+                }
+
                 try
                 {
-                    resolvedScope = ScopeProvider?.Invoke();
+                    ScopeResolution resolution = ScopeProvider.Invoke();
+                    if (resolution.IsFinal) resolvedScope = resolution.Scope;
+                    return resolution.Scope;
                 }
                 catch (Exception ex)
                 {
                     Log($"[ServerScope] Error resolving server scope: {ex.Message}");
+                    return ServerIdentity.Sanitize($"{Environment.MachineName}:pid-{Environment.ProcessId}");
                 }
-
-                if (string.IsNullOrEmpty(resolvedScope))
-                {
-                    resolvedScope = ServerIdentity.LegacyScope;
-                }
-
-                return resolvedScope;
             }
         }
 
