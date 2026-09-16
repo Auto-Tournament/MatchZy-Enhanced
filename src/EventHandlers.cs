@@ -180,6 +180,21 @@ public partial class MatchZy
         {
             CCSPlayerController? player = @event.Userid;
 
+            if (player != null && player.IsValid && player.UserId.HasValue && !IsPlayerValid(player))
+            {
+                // A player without a pawn (dead, spectating, or a bot leaving on map change) still
+                // has to be dropped from tracking. Keeping it left a stale controller under a UserId
+                // the engine later hands to a new bot, so that bot was never counted or readied
+                // (QA: match 64 stuck in warmup at 5 vs 4).
+                int pawnlessUserId = player.UserId.Value;
+                playerReadyStatus.Remove(pawnlessUserId);
+                playerData.Remove(pawnlessUserId);
+                connectedPlayers = GetRealPlayersCount();
+                if (isSimulationMode) ReleaseSimulationSlot(pawnlessUserId, "disconnect without pawn");
+                Log($"[EventPlayerDisconnect] Removed tracking for pawnless player UserId={pawnlessUserId} ({player.PlayerName}).");
+                return HookResult.Continue;
+            }
+
             if (!IsPlayerValid(player)) return HookResult.Continue;
             if (!player!.UserId.HasValue) return HookResult.Continue;
             int userId = player.UserId.Value;
@@ -238,9 +253,9 @@ public partial class MatchZy
                 // Clear simulation mapping for this player, if any, *after* we have built
                 // the event payload. This ensures player_disconnect events for simulated
                 // matches report the configured player identity instead of the raw bot.
-                if (isSimulationMode && simulationPlayersByUserId.Remove(userId))
+                if (isSimulationMode)
                 {
-                    Log($"[EventPlayerDisconnect] Cleared simulation mapping for UserId {userId}");
+                    ReleaseSimulationSlot(userId, "disconnect");
                 }
 
                 var playerDisconnectEvent = new MatchZyPlayerDisconnectedEvent
@@ -270,6 +285,12 @@ public partial class MatchZy
                 {
                     Log($"[EventPlayerDisconnect] Skipping player_disconnect event - Match not setup");
                 }
+            }
+
+            if (isSimulationMode)
+            {
+                // No-op when the event branch above already released it.
+                ReleaseSimulationSlot(userId, "disconnect");
             }
 
             TriggerMatchReportUpload("player_disconnect");

@@ -480,6 +480,8 @@ namespace MatchZy
             });
 
             AddCommandListener("noclip", OnConsoleNoClip); // Override noclip
+            // MAT "end warmup" sends a raw mp_warmup_end; route it through the start path in simulation.
+            AddCommandListener("mp_warmup_end", OnWarmupEndCommand);
 
             RegisterEventHandler<EventRoundEnd>((@event, info) =>
             {

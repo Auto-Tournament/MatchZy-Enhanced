@@ -17,6 +17,8 @@
     <Compile Include="..\..\src\BootstrapFetchDebouncer.cs" Link="BootstrapFetchDebouncer.cs" />
     <Compile Include="..\..\src\SecretRedactor.cs" Link="SecretRedactor.cs" />
     <Compile Include="..\..\src\TournamentStatusLogic.cs" Link="TournamentStatusLogic.cs" />
+    <Compile Include="..\..\src\SimulationRosterLogic.cs" Link="SimulationRosterLogic.cs" />
+    <Compile Include="..\..\src\DemoFileLocator.cs" Link="DemoFileLocator.cs" />
   </ItemGroup>
 
   <ItemGroup>
