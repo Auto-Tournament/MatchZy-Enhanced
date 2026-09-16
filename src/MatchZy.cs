@@ -577,6 +577,13 @@ namespace MatchZy
                 {
                     if (!isMatchSetup)
                     {
+                        // A map change without a server restart keeps the convars. With no
+                        // match loaded, publish idle (clearing any stale match id) before the
+                        // autostart mode sets its own state; sleep/practice publish nothing.
+                        if (!TournamentStatusLogic.HasActiveMatch(isMatchSetup, tournamentStatus.Value, null))
+                        {
+                            UpdateTournamentStatus(TournamentStatusLogic.Idle);
+                        }
                         AutoStart();
                         return;
                     }
