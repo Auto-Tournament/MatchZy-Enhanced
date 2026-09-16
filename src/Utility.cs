@@ -1248,6 +1248,9 @@ namespace MatchZy
                 ClearQueuedMatch("match reset");
             }
 
+            // Covers the post-series reset, css_restart and css_endmatch.
+            RestoreMatchRestartDelay("match reset");
+
             try
             {
                 // We stop demo recording if a live match was restarted
@@ -2168,47 +2171,32 @@ namespace MatchZy
 
             // This ensures that the mp_match_restart_delay is not shorter than what is required for the GOTV recording to finish.
             // Ref: Get5
-            int restartDelay = ConVar.Find("mp_match_restart_delay")!.GetPrimitiveValue<int>();
+            // The raise is computed per map from the operator's original value and the current
+            // tv_delay, and undone on reset, so one long-delay match no longer leaks into later ones.
+            int currentRestartDelay = ConVar.Find("mp_match_restart_delay")!.GetPrimitiveValue<int>();
             int tvDelay = GetTvDelay();
-            int tvFlushDelay;
             bool hasUploadEndpoint = !string.IsNullOrEmpty(demoUploadURL);
-            
-            // Smart delay calculation based on demo recording and upload configuration
+            MatchEndDelays delays = matchRestartDelay.Compute(currentRestartDelay, tvDelay, isDemoRecordingEnabled, hasUploadEndpoint);
+            int restartDelay = delays.RestartDelay;
+            int tvFlushDelay = delays.TvFlushDelay;
+
+            if (delays.CvarToSet is int newRestartDelay)
+            {
+                Log($"Set mp_match_restart_delay from {currentRestartDelay} to {newRestartDelay} for tv_delay {tvDelay} (original: {matchRestartDelay.OriginalDelay}) to ensure GOTV broadcast can finish.");
+                ConVar.Find("mp_match_restart_delay")!.SetValue(newRestartDelay);
+            }
+
             if (!isDemoRecordingEnabled)
             {
-                // Demo recording disabled - very fast restart
-                restartDelay = 10;
-                tvFlushDelay = 0;
                 Log($"[HandleMatchEnd] Demo recording disabled - using fast restart delay of {restartDelay}s");
             }
             else if (!hasUploadEndpoint)
             {
-                // Demo recording enabled but no upload URL - only wait for GOTV flush (no upload)
-                int requiredDelay = tvDelay + 15;
-                tvFlushDelay = requiredDelay;
-                if (tvDelay > 0.0)
-                {
-                    requiredDelay += 10;
-                }
-                restartDelay = requiredDelay;
                 Log($"[HandleMatchEnd] Demo recording enabled, no upload URL - using GOTV flush delay of {restartDelay}s (no upload wait)");
             }
             else
             {
-                // Demo recording enabled with upload URL - wait for full GOTV flush and upload
-                int requiredDelay = tvDelay + 15;
-                tvFlushDelay = requiredDelay;
-                if (tvDelay > 0.0)
-                {
-                    requiredDelay += 10;
-                }
-                if (requiredDelay > restartDelay)
-                {
-                    Log($"Extended mp_match_restart_delay from {restartDelay} to {requiredDelay} to ensure GOTV broadcast can finish.");
-                    ConVar.Find("mp_match_restart_delay")!.SetValue(requiredDelay);
-                    restartDelay = requiredDelay;
-                }
-                Log($"[HandleMatchEnd] Demo recording enabled with upload URL - using full delay for upload");
+                Log($"[HandleMatchEnd] Demo recording enabled with upload URL - using restart delay of {restartDelay}s (tv_delay {tvDelay})");
             }
             
             int currentMapNumber = matchConfig.CurrentMapNumber;
@@ -3422,6 +3410,24 @@ namespace MatchZy
                 string renderedValue = IsSafeCVarValueUnquoted(trimmed) ? trimmed : QuoteAndEscape(trimmed);
                 Log($"[ExecuteChangedConvars] Execing: {key} {(SecretRedactor.IsSecretKey(key) ? SecretRedactor.Hidden(trimmed) : renderedValue)}");
                 Server.ExecuteCommand($"{key} {renderedValue}");
+            }
+        }
+
+        private readonly MatchRestartDelayLogic matchRestartDelay = new();
+
+        /// <summary>
+        /// Puts mp_match_restart_delay back to the operator's value if HandleMatchEnd raised it
+        /// for GOTV. Safe to call repeatedly; a no-op when nothing was raised.
+        /// </summary>
+        private void RestoreMatchRestartDelay(string reason)
+        {
+            var cvar = ConVar.Find("mp_match_restart_delay");
+            if (cvar == null) return;
+            int current = cvar.GetPrimitiveValue<int>();
+            if (matchRestartDelay.Restore(current) is int original)
+            {
+                Log($"[RestoreMatchRestartDelay] Restoring mp_match_restart_delay from {current} to {original} ({reason}).");
+                cvar.SetValue(original);
             }
         }
 

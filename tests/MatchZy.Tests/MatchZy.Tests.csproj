@@ -19,6 +19,7 @@
     <Compile Include="..\..\src\TournamentStatusLogic.cs" Link="TournamentStatusLogic.cs" />
     <Compile Include="..\..\src\SimulationRosterLogic.cs" Link="SimulationRosterLogic.cs" />
     <Compile Include="..\..\src\DemoFileLocator.cs" Link="DemoFileLocator.cs" />
+    <Compile Include="..\..\src\MatchRestartDelayLogic.cs" Link="MatchRestartDelayLogic.cs" />
   </ItemGroup>
 
   <ItemGroup>
