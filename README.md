@@ -8,8 +8,8 @@
 
 # Auto Tournament CS2
 
-[![Build](https://github.com/Auto-Tournament/auto-tournament-cs2/actions/workflows/build.yml/badge.svg)](https://github.com/Auto-Tournament/auto-tournament-cs2/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/Auto-Tournament/auto-tournament-cs2)](https://github.com/Auto-Tournament/auto-tournament-cs2/releases)
+[![Build](https://github.com/Auto-Tournament/cs2-plugin/actions/workflows/build.yml/badge.svg)](https://github.com/Auto-Tournament/cs2-plugin/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/Auto-Tournament/cs2-plugin)](https://github.com/Auto-Tournament/cs2-plugin/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
@@ -39,7 +39,7 @@ sets up servers with the plugin already installed and configured.
 
 To install by hand:
 
-1. Download the [latest release](https://github.com/Auto-Tournament/auto-tournament-cs2/releases).
+1. Download the [latest release](https://github.com/Auto-Tournament/cs2-plugin/releases).
 2. Extract it into your server's `game/csgo/` directory.
 3. Restart the server.
 
