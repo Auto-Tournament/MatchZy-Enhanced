@@ -1,106 +1,121 @@
 <div align="center">
 
-  <img src="assets/icon.svg" alt="Matchzy Enhanced" width="140" height="140">
+  <img src="assets/icon.svg" alt="MatchZy Enhanced" width="140" height="140">
 
-# Matchzy Enhanced
+# MatchZy Enhanced
 
-⚡ **Enhanced CS2 match management plugin tailored for tournament automation**
-
-  <p>Enhanced fork of MatchZy tailored for the automatic tournament platform. Adds more events and enables external tools to setup, control, and track matches in real-time.</p>
-
+[![Build](https://github.com/sivert-io/MatchZy-Enhanced/actions/workflows/build.yml/badge.svg)](https://github.com/sivert-io/MatchZy-Enhanced/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/sivert-io/MatchZy-Enhanced)](https://github.com/sivert-io/MatchZy-Enhanced/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![C#](https://img.shields.io/badge/C%23-239120?logo=c-sharp&logoColor=white)](https://docs.microsoft.com/en-us/dotnet/csharp/)
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-
-**🔗 [MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament)** • **[CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager)**
 
 </div>
 
----
+MatchZy Enhanced is a fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy), the CS2 match
+plugin by WD-. It is maintained for [MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament)
+(MAT), which runs tournaments across a pool of CS2 servers and needs to set up, control and track
+matches from outside the game.
 
-## 🚀 Quick Start
+On top of MatchZy it adds more match events, a match report API, retries for events that fail to
+send, per-server config in a shared database, and a few player-facing changes such as auto-ready
+and pause limits. The full list is below.
 
-**Use [CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager)** for automated setup with MatchZy Enhanced pre-configured:
+Documentation for this fork is at [docs.sivert.io/docs/me](https://docs.sivert.io/docs/me). The
+[upstream MatchZy docs](https://shobhit-pathak.github.io/MatchZy/) are still useful background,
+but they describe upstream, and this fork doesn't always behave the same way.
 
-👉 **[Get Started with CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager)**
+## Installing
 
-### Manual Installation
+The easiest way is [CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager), which
+sets up servers with MatchZy Enhanced already installed and configured.
 
-1. Download the [latest release](https://github.com/sivert-io/MatchZy-Enhanced/releases)
-2. Extract to `game/csgo/` directory
-3. Restart your server
+To install by hand:
 
-📖 **[Documentation](https://docs.sivert.io/docs/me)**
+1. Download the [latest release](https://github.com/sivert-io/MatchZy-Enhanced/releases).
+2. Extract it into your server's `game/csgo/` directory.
+3. Restart the server.
 
----
+## What it adds
 
-## ✨ What's Enhanced
+For tournament automation:
 
-Built for **[MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament)** with extended APIs and events for tournament automation:
+- More events, so an external tool can follow a match in real time.
+- A match report API that returns the match state as structured JSON.
+- A pull API for reading match stats directly.
+- Thread-safe operations, so automation calls don't trip over each other.
+- An event retry queue: events that fail to send are queued and sent again.
+- Server tracking, with health monitoring and status events.
+- A simulation mode for testing and demos.
 
-### Tournament Features
-- 📡 **Extended event system** for real-time match tracking
-- 🔧 **Match report API** with structured JSON state
-- 🔄 **Thread-safe operations** for reliable automation
-- 🤖 **Simulation mode** for testing and demos
-- 🔁 **Event retry system** with automatic queue and recovery
-- 📊 **Server tracking** with health monitoring and status events
-- 💾 **Pull API** for direct match stats retrieval
+For players:
+
+- Auto-ready, so a match can start without everyone typing `.ready` (optional).
+- Pause limits per team, timeouts, and unpausing that needs both teams.
+- A timer on the side choice after the knife round. If it runs out, the side is picked automatically.
+- `.gg`: a team can vote to forfeit.
+- Forfeit (FFW) handling when a whole team disconnects.
+- A shorter 10 second restart delay when demos are disabled.
+- Important events shown in the center of the screen, with countdowns.
 
 ### Queued match loads
 
-`matchzy_loadmatch_url` (and `matchzy match load`) sent while the current series is in postgame does not load right away. The match is queued and loads after the series resets. The reply ends with `queued_match=<id>`, where `<id>` is the config file name without its extension (for `/api/matches/r2m1.json` that is `r2m1`), and the `matchzy_tournament_next_match` convar holds the same id. Sending another URL while one is queued replaces it.
+`matchzy_loadmatch_url` (or `matchzy match load`) sent while the current series is in postgame
+doesn't load right away. The match is queued and loads after the series resets. The reply ends with
+`queued_match=<id>`, where `<id>` is the config file name without its extension (for
+`/api/matches/r2m1.json` that is `r2m1`). The `matchzy_tournament_next_match` convar holds the
+same id. Sending another URL while one is queued replaces it.
 
-The queued match is loaded only by the automatic reset after a series ends. It is dropped when:
+Only the automatic reset after a series ends loads the queued match. It is dropped when:
 
 - `css_restart` or `css_endmatch` resets the server. The reply includes `cleared_queued_match=<id>`.
-- `matchzy_clear_queued_match` is run. This is server console / RCON only. The reply is `cleared_queued_match=<id>`, or `cleared_queued_match=none` when nothing was queued.
+- `matchzy_clear_queued_match` is run (server console or RCON only). The reply is
+  `cleared_queued_match=<id>`, or `cleared_queued_match=none` if nothing was queued.
 
 ### Bootstrap config
 
-A controller such as MatchZy Auto Tournament points a server at its bootstrap endpoint with two
-server console / RCON commands:
+A controller such as MAT points a server at its bootstrap endpoint with two server console or RCON
+commands:
 
 ```
 matchzy_bootstrap_token "<token>"
 matchzy_bootstrap_url "http://<controller>/api/servers/<server_id>/bootstrap"
 ```
 
-The plugin then fetches that URL (token sent as `X-MatchZy-Token`) and runs the commands in the
-payload. It fetches **about 1.5 seconds after the last change** to either value, not the moment
-one of them is set: every change restarts the timer, and the fetch uses the URL and token current
-when it fires. The two commands can be sent in either order and result in one fetch. On startup
-the persisted URL and token are fetched straight away.
+The plugin fetches that URL, sending the token as `X-MatchZy-Token`, and runs the commands in the
+payload. The fetch happens about 1.5 seconds after the last change to either value. Every change
+restarts the timer, and the fetch uses whatever URL and token are set when it fires, so the two
+commands can come in either order and still cause one fetch. On startup the saved URL and token are
+fetched immediately.
 
 If the payload sets a `matchzy_server_id` that differs from the id in the bootstrap URL, or from
-the id the server already had, a `[Bootstrap] WARNING` is logged. The payload is still applied.
-This usually means the bootstrap URL is stale.
+the id the server already had, the plugin logs a `[Bootstrap] WARNING` and applies the payload
+anyway. This usually means the bootstrap URL is stale.
 
-#### Logs don't contain secrets
+### Logs don't contain secrets
 
 Server logs, console output and chat never show secret values. The bootstrap, match and report
-tokens, remote log / demo upload / backup header values, `sv_password`, `rcon_password` and any
-other `*token*`, `*password*`, `*secret*` or `*header_value*` setting are logged as
-`(hidden, N chars)`. The same goes for those values inside logged payloads, match configs, HTTP
-responses, request headers and URL query strings (`?token=`). Logs are safe to share when asking
-for help.
+tokens, the remote log, demo upload and backup header values, `sv_password`, `rcon_password`, and
+any other setting with `token`, `password`, `secret` or `header_value` in its name are logged as
+`(hidden, N chars)`. The same applies to those values inside logged payloads, match configs, HTTP
+responses, request headers and URL query strings (`?token=`). You can share logs when asking for
+help.
 
-Older versions printed the token when saving it, e.g.
+Older versions printed the token when saving it, for example
 `[SaveConfigValue] Saved config for server '...': matchzy_bootstrap_token = <token>`. If you
 shared logs from an older version, rotate the MAT `SERVER_TOKEN` and push the new token to your
 servers.
 
-### Multi-server setups sharing one database
+### Several servers sharing one database
 
-Several servers can point at the same MySQL database. That is the point of a shared stats
-database, and it now works for persistent config too.
+Several servers can use the same MySQL database. Match, map and player stats in the
+`matchzy_stats_*` tables are shared between them, which is the reason to do this in the first
+place.
 
-Everything MatchZy persists — the `matchzy_server_config` table and the event retry queue — is
-stored against an identity for the server that wrote it, so one server can no longer overwrite
-another's values. Before this, whichever server wrote last won, and on restart every server on the
-box loaded that one server's `matchzy_server_id`, bootstrap URL and remote log settings.
+Persistent config is stored per server. The `matchzy_server_config` table and the event retry
+queue are keyed by the identity of the server that wrote them, so one server can't overwrite
+another's values. Before this change the last server to write won, and after a restart every
+server on the box loaded that server's `matchzy_server_id`, bootstrap URL and remote log settings.
 
-**The settings that are now per server**, i.e. each server keeps its own value:
+These settings are stored per server:
 
 - `matchzy_server_id`
 - `matchzy_bootstrap_url`, `matchzy_bootstrap_token`
@@ -112,97 +127,72 @@ box loaded that one server's `matchzy_server_id`, bootstrap URL and remote log s
 - `matchzy_chat_prefix`, `matchzy_admin_chat_prefix`
 - all `matchzy_warmup_*` settings
 
-The chat prefixes and the warmup settings are usually the same on every server, but they are
-scoped the same way as the rest: one shared row for them was only ever an accident of the old
-storage, and "last writer wins" is not a useful way to share a value. Set them per server, or
-leave the existing shared value in place (see backwards compatibility below).
+The chat prefixes and warmup settings are usually the same on every server, but they're scoped
+like the rest. The old single shared row for them came from how storage used to work, not from a
+design choice, and "last writer wins" is a poor way to share a value. Set them per server, or keep
+the existing shared value (see backwards compatibility below).
 
-Genuinely global data — match, map and player stats in `matchzy_stats_*` — is untouched and stays
-shared, which is why you point several servers at one database in the first place.
+**How a server identifies itself.** The identity is the bind address plus the game port, for
+example `cs2:27015`, `cs2:27025` and `cs2:27035` for three servers on a box named `cs2`. The bind
+address is used when it names a real interface. CS2 servers are nearly always started with
+`-ip 0.0.0.0`, which doesn't identify anything, so the machine name is used instead. You don't
+need to configure anything for this, and it works before a controller like MAT has talked to the
+server.
 
-**How a server identifies itself.** The identity is derived from the bind address and the game
-port, e.g. `cs2:27015`, `cs2:27025`, `cs2:27035` for three servers on a box named `cs2`. The bind
-address is used when it names a real interface; CS2 servers are nearly always started with
-`-ip 0.0.0.0`, which identifies nothing, so the machine name is used instead. Nothing has to be
-configured for this to work, including before a controller like MAT has ever talked to the server.
-
-Two things change a server's identity: changing its game port, and renaming the box. Neither
-loses data — the server simply finds no row of its own and falls back to the shared pre-upgrade
-row, and a controller re-pushes its values on the next configure. To pin a name that survives
-both, set an explicit scope:
+Changing the game port or renaming the box changes the identity. No data is lost: the server finds
+no row of its own, falls back to the shared pre-upgrade row, and the controller pushes its values
+again on the next configure. To keep a fixed name through both, set a scope explicitly:
 
 ```
-# in the server's start arguments (reliable: config.cfg may not have executed yet)
+# in the server's start arguments (config.cfg may not have run yet, so this is more reliable)
 +matchzy_config_scope tournament-eu-3
 ```
 
-`matchzy_config_scope` can also go in `config.cfg`, but the start-argument form is the one to
-prefer and wins when both are set. It is never persisted to the database — a value that decides
-which rows you read cannot itself be read from those rows.
+`matchzy_config_scope` also works in `config.cfg`, but prefer the start argument. It wins when both
+are set. The scope is never saved to the database, since it decides which rows are read.
 
-The resolved scope is logged once at startup, e.g.
-`[ConfigScope] Using scope 'cs2-server-2' (from start argument)`. The order is: the
+The scope is logged once at startup, for example
+`[ConfigScope] Using scope 'cs2-server-2' (from start argument)`. It is resolved in this order: the
 `+matchzy_config_scope` start argument, the `matchzy_config_scope` convar, `-port` in the start
-arguments, then the `hostport` convar once the server has activated. Start arguments are read from
-`/proc/self/cmdline` on Linux. If none of these identify the server, MatchZy uses a key derived
-from the server's install path (still distinct per server, never a key shared by the whole box)
-and logs a warning — add `+matchzy_config_scope` when you see it.
+arguments, then the `hostport` convar once the server has activated. On Linux, start arguments are
+read from `/proc/self/cmdline`. If none of these identify the server, MatchZy uses a key derived
+from the install path (still different for each server, never one key for the whole box) and logs
+a warning. Add `+matchzy_config_scope` if you see it.
 
-**Upgrading from 1.4.26.** 1.4.26 could not read the start arguments inside the game process and
-resolved every server on a box to the same `<host>:27015` scope, so those rows hold whichever
-server wrote last. They are left in place but no longer read by any server that resolves a
-different scope (reads only ever fall back to the pre-scoping shared row, never to another
-scope). A controller re-pushes the correct values on the next configure. Once every server logs
-its own scope you can remove the stale rows, e.g.
-`DELETE FROM matchzy_server_config WHERE server_scope = 'cs2:27015';` — but only if no server on
-that box legitimately resolves to that scope (a server without `+matchzy_config_scope` on port
-27015 does).
+**Upgrading from 1.4.26.** 1.4.26 couldn't read the start arguments inside the game process, so it
+resolved every server on a box to the same `<host>:27015` scope, and those rows hold whatever the
+last server wrote. They stay in the database, but a server that resolves to a different scope won't
+read them: reads only fall back to the pre-scoping shared row, never to another scope. The
+controller pushes the correct values again on the next configure. Once every server logs its own
+scope you can remove the stale rows, for example
+`DELETE FROM matchzy_server_config WHERE server_scope = 'cs2:27015';`. Only do this if no server on
+that box really resolves to that scope. A server on port 27015 without `+matchzy_config_scope`
+does.
 
-**Backwards compatibility.** Rows written before this change are kept and treated as shared
-fallbacks. A server reads its own row when it has one and the shared row otherwise, and only ever
-writes its own row. So one server per database keeps working with no operator action, and a
-multi-server setup keeps its current behaviour until each server writes its own values. The
-schema migration runs automatically on startup and is a no-op once applied.
+**Backwards compatibility.** Rows written before this change are kept and used as shared
+fallbacks. A server reads its own row if it has one and the shared row otherwise, and only writes
+its own row. One server per database keeps working without any changes, and a multi-server setup
+behaves as before until each server has written its own values. The schema migration runs on
+startup and does nothing once applied.
 
-If you worked around this by moving servers to per-server SQLite files, you can move them back to
-the shared MySQL database.
+If you moved servers to separate SQLite files to work around this, you can move them back to the
+shared MySQL database.
 
-### Player Features
-- 🚀 **Auto-ready system** — Instant match starts (optional)
-- ⏸️ **Enhanced pauses** — Team limits, timeouts, dual unpause
-- ⏱️ **Side selection timer** — Auto-decide after knife round
-- 🏳️ **`.gg` command** — Team vote to forfeit early
-- 🚫 **FFW system** — Handle full team disconnects
-- ⚡ **Smart demo delays** — 10s restart when demos disabled
-- 📺 **Center notifications** — Important events shown center-screen with countdown timers
+## Documentation
 
----
+- [Configuration](https://docs.sivert.io/docs/me/user/configuration): all convars, with examples
+- [Commands](https://docs.sivert.io/docs/me/user/commands): player and admin commands
+- [Integration](https://docs.sivert.io/docs/me/advanced/integration): API endpoints and events
+- [Changelog](https://docs.sivert.io/docs/me/advanced/changelog)
 
-## 📖 Documentation (docs.sivert.io)
+## Related projects
 
-- 📋 **[Configuration Guide](https://docs.sivert.io/docs/me/user/configuration)** — All ConVars and examples
-- 🎮 **[Commands Reference](https://docs.sivert.io/docs/me/user/commands)** — Player and admin commands
-- 🔗 **[Integration Guide](https://docs.sivert.io/docs/me/advanced/integration)** — API endpoints and events
-- 📝 **[Changelog](https://docs.sivert.io/docs/me/advanced/changelog)** — Release history
+- [MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament): the tournament platform this fork is built for
+- [CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager): sets up and runs multiple CS2 servers
 
----
+## Credits
 
-## 🔗 Related Projects
-
-- **[MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament)** — Automated tournament platform
-- **[CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager)** — Multi-server deployment tool
-
-## 🙏 Credits
-
-**Original MatchZy:** [shobhit-pathak/MatchZy](https://github.com/shobhit-pathak/MatchZy) by WD-  
-**Enhanced Fork:** Maintained by [sivert-io](https://github.com/sivert-io) for [MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament)
-
-Built with [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp/) • Inspired by [Get5](https://github.com/splewis/get5)
-
----
-
-<div align="center">
-
-<strong>Made with ❤️ for the CS2 community</strong>
-
-</div>
+MatchZy is written by WD- ([shobhit-pathak/MatchZy](https://github.com/shobhit-pathak/MatchZy)).
+This fork is maintained by [sivert-io](https://github.com/sivert-io). Both are built on
+[CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp/), and MatchZy was inspired
+by [Get5](https://github.com/splewis/get5).
