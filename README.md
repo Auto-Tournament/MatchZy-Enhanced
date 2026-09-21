@@ -1,6 +1,10 @@
 <div align="center">
 
-  <img src="assets/icon.svg" alt="MatchZy Enhanced" width="140" height="140">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/me-wordmark-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo/me-wordmark-light.svg">
+    <img src="assets/logo/me-wordmark-light.svg" alt="MatchZy Enhanced" height="56">
+  </picture>
 
 # MatchZy Enhanced
 
