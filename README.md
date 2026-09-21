@@ -204,3 +204,7 @@ MatchZy is written by WD- ([shobhit-pathak/MatchZy](https://github.com/shobhit-p
 This fork is maintained by [sivert-io](https://github.com/sivert-io). Both are built on
 [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp/), and MatchZy was inspired
 by [Get5](https://github.com/splewis/get5).
+
+---
+
+The logo was generated with an AI image model (ChatGPT) and then cleaned up and recoloured by hand.
