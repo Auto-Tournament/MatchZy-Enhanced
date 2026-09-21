@@ -218,7 +218,7 @@ namespace MatchZy
             command.ReplyToCommand($"matchzy_knife_enabled_default = {(isKnifeRequired ? 1 : 0)}");
         }
 
-        [ConsoleCommand("matchzy_playout_enabled_default", "Whether knife round is enabled by default or not. Default value: true")]
+        [ConsoleCommand("matchzy_playout_enabled_default", "Whether playout (playing out all rounds and disabling overtime/early clinch) is enabled by default or not. Default value: false")]
         public void MatchZyPlayoutConvar(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -355,7 +355,7 @@ namespace MatchZy
             }
         }
 
-        [ConsoleCommand("matchzy_stop_command_available", "Whether .stop command is enabled or not (to restore the current round). Default value: false")]
+        [ConsoleCommand("matchzy_stop_command_available", "Whether .stop command is enabled or not (to restore the current round). Default value: true")]
         public void MatchZyStopCommandEnabled(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -418,7 +418,7 @@ namespace MatchZy
             database.SaveConfigValue("matchzy_chat_prefix", chatPrefix);
         }
 
-        [ConsoleCommand("matchzy_admin_chat_prefix", "Chat prefix to show whenever an admin sends message using .asay <message>. Default value: [{Green}MatchZy{Default}]")]
+        [ConsoleCommand("matchzy_admin_chat_prefix", "Chat prefix to show whenever an admin sends message using .asay <message>. Default value: [{Red}ADMIN{Default}]")]
         public void MatchZyAdminChatPrefix(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -453,7 +453,7 @@ namespace MatchZy
             database.SaveConfigValue("matchzy_admin_chat_prefix", adminChatPrefix);
         }
 
-        [ConsoleCommand("matchzy_chat_messages_timer_delay", "Number of seconds of delay before sending reminder messages from MatchZy (like unready message, paused message, etc). Default: 12")]
+        [ConsoleCommand("matchzy_chat_messages_timer_delay", "Number of seconds of delay before sending reminder messages from MatchZy (like unready message, paused message, etc). Default: 13")]
         public void MatchZyChatMessagesTimerDelay(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;

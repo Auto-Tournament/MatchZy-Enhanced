@@ -366,7 +366,7 @@ namespace MatchZy
                         }
                         if (field == "num_maps" && numMaps > jsonData["maplist"]!.ToObject<List<string>>()!.Count)
                         {
-                            return $"{field} should be equal to or greater than maplist!";
+                            return $"{field} should be less than or equal to the number of maps in maplist!";
                         }
 
                         break;
