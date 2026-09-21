@@ -19,7 +19,7 @@
 > redirect, and nothing changes for existing installs.
 
 MatchZy Enhanced is a fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy), the CS2 match
-plugin by WD-. It is maintained for [MatchZy Auto Tournament](https://github.com/Auto-Tournament/matchzy-auto-tournament)
+plugin by WD-. It is maintained for [Auto Tournament](https://github.com/Auto-Tournament/auto-tournament)
 (MAT), which runs tournaments across a pool of CS2 servers and needs to set up, control and track
 matches from outside the game.
 
@@ -195,7 +195,7 @@ shared MySQL database.
 
 ## Related projects
 
-- [MatchZy Auto Tournament](https://github.com/Auto-Tournament/matchzy-auto-tournament): the tournament platform this fork is built for
+- [Auto Tournament](https://github.com/Auto-Tournament/auto-tournament): the tournament platform this fork is built for
 - [CS2 Server Manager](https://github.com/Auto-Tournament/cs2-server-manager): sets up and runs multiple CS2 servers
 
 ## Credits
