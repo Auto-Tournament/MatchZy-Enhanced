@@ -3,24 +3,25 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo/me-wordmark-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/logo/me-wordmark-light.svg">
-    <img src="assets/logo/me-wordmark-light.svg" alt="MatchZy Enhanced" height="56">
+    <img src="assets/logo/me-wordmark-light.svg" alt="Auto Tournament CS2" height="56">
   </picture>
 
-# MatchZy Enhanced
+# Auto Tournament CS2
 
-[![Build](https://github.com/Auto-Tournament/MatchZy-Enhanced/actions/workflows/build.yml/badge.svg)](https://github.com/Auto-Tournament/MatchZy-Enhanced/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/Auto-Tournament/MatchZy-Enhanced)](https://github.com/Auto-Tournament/MatchZy-Enhanced/releases)
+[![Build](https://github.com/Auto-Tournament/auto-tournament-cs2/actions/workflows/build.yml/badge.svg)](https://github.com/Auto-Tournament/auto-tournament-cs2/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/Auto-Tournament/auto-tournament-cs2)](https://github.com/Auto-Tournament/auto-tournament-cs2/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
 
-> **Moved:** this repository is now part of the [Auto-Tournament](https://github.com/Auto-Tournament)
-> organisation, together with Auto Tournament (formerly MatchZy Auto Tournament). Old links
-> redirect, and nothing changes for existing installs.
+> **Formerly MatchZy Enhanced.** Same plugin, new name, now part of the
+> [Auto-Tournament](https://github.com/Auto-Tournament) organisation. The plugin still loads as
+> MatchZy on the server, and its commands, settings and release files keep their names, so
+> nothing changes for existing installs.
 
-MatchZy Enhanced is a fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy), the CS2 match
-plugin by WD-. It is maintained for [Auto Tournament](https://github.com/Auto-Tournament/auto-tournament)
-(MAT), which runs tournaments across a pool of CS2 servers and needs to set up, control and track
+Auto Tournament CS2 is the CS2 server plugin for [Auto Tournament](https://github.com/Auto-Tournament/auto-tournament).
+It is based on [MatchZy](https://github.com/shobhit-pathak/MatchZy), the CS2 match plugin by WD-.
+Auto Tournament runs tournaments across a pool of CS2 servers and needs to set up, control and track
 matches from outside the game.
 
 On top of MatchZy it adds more match events, a match report API, retries for events that fail to
@@ -34,11 +35,11 @@ but they describe upstream, and this fork doesn't always behave the same way.
 ## Installing
 
 The easiest way is [CS2 Server Manager](https://github.com/Auto-Tournament/cs2-server-manager), which
-sets up servers with MatchZy Enhanced already installed and configured.
+sets up servers with the plugin already installed and configured.
 
 To install by hand:
 
-1. Download the [latest release](https://github.com/Auto-Tournament/MatchZy-Enhanced/releases).
+1. Download the [latest release](https://github.com/Auto-Tournament/auto-tournament-cs2/releases).
 2. Extract it into your server's `game/csgo/` directory.
 3. Restart the server.
 
@@ -80,7 +81,7 @@ Only the automatic reset after a series ends loads the queued match. It is dropp
 
 ### Bootstrap config
 
-A controller such as MAT points a server at its bootstrap endpoint with two server console or RCON
+A controller such as Auto Tournament points a server at its bootstrap endpoint with two server console or RCON
 commands:
 
 ```
@@ -109,7 +110,7 @@ help.
 
 Older versions printed the token when saving it, for example
 `[SaveConfigValue] Saved config for server '...': matchzy_bootstrap_token = <token>`. If you
-shared logs from an older version, rotate the MAT `SERVER_TOKEN` and push the new token to your
+shared logs from an older version, rotate the Auto Tournament `SERVER_TOKEN` and push the new token to your
 servers.
 
 ### Several servers sharing one database
@@ -144,7 +145,7 @@ the existing shared value (see backwards compatibility below).
 example `cs2:27015`, `cs2:27025` and `cs2:27035` for three servers on a box named `cs2`. The bind
 address is used when it names a real interface. CS2 servers are nearly always started with
 `-ip 0.0.0.0`, which doesn't identify anything, so the machine name is used instead. You don't
-need to configure anything for this, and it works before a controller like MAT has talked to the
+need to configure anything for this, and it works before a controller like Auto Tournament has talked to the
 server.
 
 Changing the game port or renaming the box changes the identity. No data is lost: the server finds
