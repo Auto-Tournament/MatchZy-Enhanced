@@ -8,14 +8,18 @@
 
 # MatchZy Enhanced
 
-[![Build](https://github.com/sivert-io/MatchZy-Enhanced/actions/workflows/build.yml/badge.svg)](https://github.com/sivert-io/MatchZy-Enhanced/actions/workflows/build.yml)
-[![Release](https://img.shields.io/github/v/release/sivert-io/MatchZy-Enhanced)](https://github.com/sivert-io/MatchZy-Enhanced/releases)
+[![Build](https://github.com/Auto-Tournament/MatchZy-Enhanced/actions/workflows/build.yml/badge.svg)](https://github.com/Auto-Tournament/MatchZy-Enhanced/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/Auto-Tournament/MatchZy-Enhanced)](https://github.com/Auto-Tournament/MatchZy-Enhanced/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
 
+> **Moved:** this repository is now part of the [Auto-Tournament](https://github.com/Auto-Tournament)
+> organisation, together with Auto Tournament (formerly MatchZy Auto Tournament). Old links
+> redirect, and nothing changes for existing installs.
+
 MatchZy Enhanced is a fork of [MatchZy](https://github.com/shobhit-pathak/MatchZy), the CS2 match
-plugin by WD-. It is maintained for [MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament)
+plugin by WD-. It is maintained for [MatchZy Auto Tournament](https://github.com/Auto-Tournament/matchzy-auto-tournament)
 (MAT), which runs tournaments across a pool of CS2 servers and needs to set up, control and track
 matches from outside the game.
 
@@ -29,12 +33,12 @@ but they describe upstream, and this fork doesn't always behave the same way.
 
 ## Installing
 
-The easiest way is [CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager), which
+The easiest way is [CS2 Server Manager](https://github.com/Auto-Tournament/cs2-server-manager), which
 sets up servers with MatchZy Enhanced already installed and configured.
 
 To install by hand:
 
-1. Download the [latest release](https://github.com/sivert-io/MatchZy-Enhanced/releases).
+1. Download the [latest release](https://github.com/Auto-Tournament/MatchZy-Enhanced/releases).
 2. Extract it into your server's `game/csgo/` directory.
 3. Restart the server.
 
@@ -191,8 +195,8 @@ shared MySQL database.
 
 ## Related projects
 
-- [MatchZy Auto Tournament](https://github.com/sivert-io/matchzy-auto-tournament): the tournament platform this fork is built for
-- [CS2 Server Manager](https://github.com/sivert-io/cs2-server-manager): sets up and runs multiple CS2 servers
+- [MatchZy Auto Tournament](https://github.com/Auto-Tournament/matchzy-auto-tournament): the tournament platform this fork is built for
+- [CS2 Server Manager](https://github.com/Auto-Tournament/cs2-server-manager): sets up and runs multiple CS2 servers
 
 ## Credits
 
