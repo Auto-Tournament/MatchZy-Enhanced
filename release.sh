@@ -455,7 +455,7 @@ git push origin "$CURRENT_BRANCH"
 echo -e "\n${BLUE}🌟 Creating GitHub release (and tag v${VERSION})...${NC}"
 gh release create "v${VERSION}" \
     "${BUILD_ROOT}/${RELEASE_DIR}.zip" \
-    --title "MatchZy v${VERSION}" \
+    --title "Auto Tournament CS2 v${VERSION}" \
     --notes "$RELEASE_NOTES" \
     --draft=false \
     --latest
