@@ -28,56 +28,37 @@ public partial class MatchZy
 
     public bool IsTeamReady(int team)
     {
-        // if (matchStarted) return true;
-
         int minPlayers = GetPlayersPerTeam(team);
         int minReady = GetTeamMinReady(team);
         (int playerCount, int readyCount) = GetTeamPlayerCount(team, false);
 
-        Log($"[IsTeamReady] team: {team} minPlayers:{minPlayers} minReady:{minReady} playerCount:{playerCount} readyCount:{readyCount}");
+        // team is the CS2 team number (1 = Spectator, 2 = T, 3 = CT).
+        Log($"[IsTeamReady] team: {team} ({ReadyLogic.TeamLabel(team)}) minPlayers:{minPlayers} minReady:{minReady} playerCount:{playerCount} readyCount:{readyCount} tracked:{playerData.Count}");
 
-        if (team == (int)CsTeam.Spectator && minReady == 0)
-        {
-            return true;
-        }
+        bool forced = allowForceReady
+            && Enum.IsDefined(typeof(CsTeam), team)
+            && teamReadyOverride.ContainsKey((CsTeam)team)
+            && IsTeamForcedReady((CsTeam)team);
 
-        if (readyAvailable && playerCount == 0)
-        {
-            // We cannot ready for veto with no players, regardless of force status or min_players_to_ready.
-            return false;
-        }
+        return ReadyLogic.IsTeamReady(team, playerCount, readyCount, minPlayers, minReady, readyAvailable, forced);
+    }
 
-        // Require full rosters (players_per_team) before the match can start.
-        if (playerCount < minPlayers)
-        {
-            return false;
-        }
+    /// <summary>
+    /// Makes sure a player who is readying up is in playerData under a live controller.
+    /// The ready count only walks playerData, so a player missing from it (or tracked
+    /// under a stale controller) could type .ready and never be counted.
+    /// </summary>
+    private void EnsurePlayerTrackedForReady(CCSPlayerController player)
+    {
+        if (!player.IsValid || !player.UserId.HasValue) return;
+        int userId = player.UserId.Value;
+        bool isTracked = playerData.TryGetValue(userId, out var tracked);
+        bool trackedValid = isTracked && tracked != null && tracked.IsValid;
+        if (!ReadyLogic.NeedsTrackingOnReady(player.IsHLTV, player.IsBot, isTracked, trackedValid)) return;
 
-        // Interpret minReady as a per-team threshold:
-        // - 0 => everyone connected on that team must ready
-        // - N => at least N players on that team must ready
-        if (minReady <= 0)
-        {
-            if (playerCount == readyCount)
-            {
-                return true;
-            }
-        }
-        else
-        {
-            if (readyCount >= minReady)
-            {
-                return true;
-            }
-        }
-
-        // Allow admins to force-ready a team during setup, but do not bypass roster requirements.
-        if (allowForceReady && IsTeamForcedReady((CsTeam)team))
-        {
-            return true;
-        }
-
-        return false;
+        playerData[userId] = player;
+        connectedPlayers = GetRealPlayersCount();
+        Log($"[!ready command] {player.PlayerName} (UserId={userId}, TeamNum={player.TeamNum}) was {(isTracked ? "tracked under a stale controller" : "not tracked")}; registered now.");
     }
 
     public int GetPlayersPerTeam(int team)

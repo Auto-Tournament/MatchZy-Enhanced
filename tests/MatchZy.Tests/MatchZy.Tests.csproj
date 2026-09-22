@@ -20,6 +20,7 @@
     <Compile Include="..\..\src\SimulationRosterLogic.cs" Link="SimulationRosterLogic.cs" />
     <Compile Include="..\..\src\DemoFileLocator.cs" Link="DemoFileLocator.cs" />
     <Compile Include="..\..\src\MatchRestartDelayLogic.cs" Link="MatchRestartDelayLogic.cs" />
+    <Compile Include="..\..\src\ReadyLogic.cs" Link="ReadyLogic.cs" />
   </ItemGroup>
 
   <ItemGroup>
