@@ -554,8 +554,23 @@ namespace MatchZy
             //     return HookResult.Continue;
             // });
 
+            RegisterListener<Listeners.OnMapEnd>(() =>
+            {
+                MapTransitionBreadcrumb($"OnMapEnd: {Server.MapName}");
+
+                // The 10 Hz practice !timer display reads a cached controller and its pawn.
+                // Controllers from the ending map must not be touched on the next one, so
+                // stop those timers here (they are also STOP_ON_MAPCHANGE).
+                foreach (var practiceTimer in playerTimers.Values)
+                {
+                    practiceTimer.KillTimer();
+                }
+                playerTimers.Clear();
+            });
+
             RegisterListener<Listeners.OnMapStart>(mapName =>
             {
+                MapTransitionBreadcrumb($"OnMapStart: {mapName}");
                 serverActivated = true;
                 workshopMaps.OnMapStarted(mapName);
                 if (persistentConfigLoadPending)
@@ -578,6 +593,7 @@ namespace MatchZy
 
                 AddTimer(1.0f, () =>
                 {
+                    MapTransitionBreadcrumb($"OnMapStart+1s: {Server.MapName}");
                     if (!isMatchSetup)
                     {
                         // A map change without a server restart keeps the convars. With no

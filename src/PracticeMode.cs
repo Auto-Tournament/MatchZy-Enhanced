@@ -1638,7 +1638,7 @@ namespace MatchZy
                 playerTimers[userId] = new PlayerPracticeTimer(PracticeTimerType.Immediate)
                 {
                     StartTime = DateTime.Now,
-                    Timer = AddTimer(0.1f, () => DisplayPracticeTimerCenter(userId), TimerFlags.REPEAT)
+                    Timer = AddTimer(0.1f, () => DisplayPracticeTimerCenter(userId), TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE)
                 };
                 PrintToPlayerChat(player, $"Timer started! User !timer to stop it.");
             }

@@ -42,8 +42,9 @@ namespace MatchZy
         public FakeConVar<bool> debugConsoleEnabled = new("matchzy_debug_console", "Whether to write verbose debug logs to the server console. Default: true", true);
 
         // Crash / transition breadcrumbs (writes checkpoints to console + a file)
-        // Useful when diagnosing CS2 segfaults during phase transitions (warmup -> knife/live).
-        public FakeConVar<bool> crashDebugBreadcrumbs = new("matchzy_crash_debug_breadcrumbs", "When enabled, writes transition breadcrumbs to MatchZy/logs/matchzy_breadcrumbs.log to help diagnose crashes. Default: false", false);
+        // Useful when diagnosing CS2 segfaults during phase transitions (warmup -> knife/live)
+        // and map changes (map change issued, OnMapEnd, OnMapStart, with player/timer counts and memory).
+        public FakeConVar<bool> crashDebugBreadcrumbs = new("matchzy_crash_debug_breadcrumbs", "When enabled, writes phase-transition and map-change breadcrumbs to cfg/MatchZy/logs/matchzy_breadcrumbs.log to help diagnose crashes. Default: false", false);
         
         // MatchZy-safe CS2 update checks (Steam UpToDateCheck)
         public FakeConVar<bool> safeAutoUpdaterEnabled = new(

@@ -57,6 +57,38 @@ namespace MatchZy
             }
         }
 
+        /// <summary>
+        /// Map-change breadcrumb (matchzy_crash_debug_breadcrumbs). Adds the state that
+        /// matters for "crashes on map change with 5+ players / long uptime" reports:
+        /// how many controllers the plugin still holds from the previous map, coaches,
+        /// pending per-player timers, and process memory / uptime for leak hunting.
+        /// Only counts are read; no entity is touched here.
+        /// </summary>
+        private void MapTransitionBreadcrumb(string step)
+        {
+            if (!crashDebugBreadcrumbs.Value) return;
+
+            string stats;
+            try
+            {
+                using var process = System.Diagnostics.Process.GetCurrentProcess();
+                double uptimeMinutes = (DateTime.Now - process.StartTime).TotalMinutes;
+                long workingSetMb = process.WorkingSet64 / (1024 * 1024);
+                long managedMb = GC.GetTotalMemory(false) / (1024 * 1024);
+                stats = $"trackedPlayers={playerData.Count} readyEntries={playerReadyStatus.Count} " +
+                        $"coaches={matchzyTeam1.coach.Count + matchzyTeam2.coach.Count} " +
+                        $"autoReadyTimers={autoReadyPendingReadyTimers.Count} practiceTimers={playerTimers.Count} " +
+                        $"matchSetup={isMatchSetup} live={isMatchLive} practice={isPractice} sim={isSimulationMode} " +
+                        $"uptimeMin={uptimeMinutes:0} workingSetMB={workingSetMb} managedMB={managedMb}";
+            }
+            catch (Exception e)
+            {
+                stats = $"stats unavailable: {e.Message}";
+            }
+
+            CrashBreadcrumb($"{step} | {stats}");
+        }
+
         private void PrintToPlayerChat(CCSPlayerController player, string message)
         {
             player.PrintToChat($"{chatPrefix} {message}");
@@ -1696,6 +1728,7 @@ namespace MatchZy
             }
 
             if (kind == MapChangeKind.WorkshopId) workshopMaps.MarkPending(arg);
+            MapTransitionBreadcrumb($"MapChange[{logTag}]: {command} {arg} (from {Server.MapName})");
             Log($"[{logTag}] {command} {arg} (input: '{mapInput}')");
             Server.ExecuteCommand($"{command} \"{arg}\"");
             return true;
