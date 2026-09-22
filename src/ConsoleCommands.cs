@@ -70,6 +70,8 @@ namespace MatchZy
             {
                 if (player.UserId.HasValue)
                 {
+                    EnsurePlayerTrackedForReady(player);
+
                     // Auto-ready opt-out: player manually readied, so clear opt-out and any pending timers.
                     autoReadyOptOutUserIds.Remove(player.UserId.Value);
                     if (autoReadyPendingReadyTimers.TryGetValue(player.UserId.Value, out var pending))
