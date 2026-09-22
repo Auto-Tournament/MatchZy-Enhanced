@@ -557,6 +557,7 @@ namespace MatchZy
             RegisterListener<Listeners.OnMapStart>(mapName =>
             {
                 serverActivated = true;
+                workshopMaps.OnMapStarted(mapName);
                 if (persistentConfigLoadPending)
                 {
                     persistentConfigLoadPending = false;
