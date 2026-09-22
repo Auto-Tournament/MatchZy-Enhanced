@@ -630,36 +630,10 @@ namespace MatchZy
                 SendPlayerNotAdminMessage(player);
                 return;
             }
-            string currentMapName = Server.MapName;
-            if (long.TryParse(currentMapName, out _))
-            { // Check if mapName is a long for workshop map ids
-                if (!isSimulationMode)
-                {
-                    Log("[MapReload] Executing bot_kick before host_workshop_map (non-simulation match).");
-                    Server.ExecuteCommand("bot_kick");
-                }
-                else
-                {
-                    Log("[MapReload] Skipping bot_kick before host_workshop_map because simulation mode is active.");
-                }
-                Server.ExecuteCommand($"host_workshop_map \"{currentMapName}\"");
-            }
-            else if (Server.IsMapValid(currentMapName))
+            // On a workshop map Server.MapName is the map's name, not its id; ExecuteMapChange
+            // reuses the workshop id that loaded it, or falls back to ds_workshop_changelevel.
+            if (!ExecuteMapChange(Server.MapName, "MapReload"))
             {
-                if (!isSimulationMode)
-                {
-                    Log("[MapReload] Executing bot_kick before changelevel (non-simulation match).");
-                    Server.ExecuteCommand("bot_kick");
-                }
-                else
-                {
-                    Log("[MapReload] Skipping bot_kick before changelevel because simulation mode is active.");
-                }
-                Server.ExecuteCommand($"changelevel \"{currentMapName}\"");
-            }
-            else
-            {
-                // ReplyToUserCommand(player, "Invalid map name!");
                 ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
             }
         }

@@ -574,7 +574,6 @@ namespace MatchZy
                 }
             }
 
-            string currentMapName = Server.MapName;
             string mapName = matchConfig.Maplist[0];
 
             // After a server restart the server can already be on the match map with no SourceTV
@@ -587,7 +586,7 @@ namespace MatchZy
                 Server.ExecuteCommand("tv_enable 1");
             }
 
-            bool willChangeMap = IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || currentMapName != mapName || sourceTvReloadRequired;
+            bool willChangeMap = IsMapReloadRequiredForGameMode(matchConfig.Wingman) || mapReloadRequired || !IsOnMap(mapName) || sourceTvReloadRequired;
 
             if (willChangeMap)
             {

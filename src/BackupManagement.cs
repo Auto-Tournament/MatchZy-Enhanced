@@ -310,7 +310,7 @@ namespace MatchZy
                 }
                 if (backupData.TryGetValue("map_name", out var map_name))
                 {
-                    if (map_name != Server.MapName)
+                    if (!IsOnMap(map_name))
                     {
                         ChangeMap(map_name, 0);
                         isRoundRestorePending = true;
