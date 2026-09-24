@@ -119,16 +119,19 @@ namespace MatchZy
                     Log("[StartDemoRecording] WARNING: no SourceTV master is running (it is only created on map load with tv_enable 1). tv_record will not write a demo.");
                     Log($"[DEMO_RECORDING] NO_SOURCETV file=\"{demoFileName}\"");
                 }
-                string tempDemoPath = demoPath == "" ? demoFileName : demoPath + demoFileName;
+                // Relative to csgo/: StopDemoRecording joins it onto the csgo directory again.
+                string tempDemoPath = DemoFileLocator.NormalizeDemoPath(demoPath) + demoFileName;
                 activeDemoFile = tempDemoPath;
-                string fullPath = Path.Join(Server.GameDirectory + "/csgo/", tempDemoPath);
+                // tv_record gets the absolute path. A relative one lands in the first Game search
+                // path, which is csgo/addons/metamod/ on Metamod servers (issue #35).
+                string fullPath = DemoFileLocator.TvRecordPath(Server.GameDirectory, demoPath, demoFileName);
                 Log($"[StartDemoRecording] Starting demo recording:");
                 Log($"[StartDemoRecording]   - Demo file: {demoFileName}");
                 Log($"[StartDemoRecording]   - Relative path: {tempDemoPath}");
                 Log($"[StartDemoRecording]   - Full path: {fullPath}");
                 Log($"[StartDemoRecording]   - GOTV enabled: {tvEnable}");
                 Log($"[DEMO_RECORDING] START file=\"{demoFileName}\" rel=\"{tempDemoPath}\" gotv={(tvEnable ? 1 : 0)}");
-                Server.ExecuteCommand($"tv_record {tempDemoPath}");
+                Server.ExecuteCommand($"tv_record {DemoFileLocator.TvRecordArgument(fullPath)}");
                 isDemoRecording = true;
                 demoRecordingStartedUtc = DateTime.UtcNow;
                 Log($"[StartDemoRecording] Demo recording started{(sourceTvActive ? " successfully" : " (SourceTV missing, demo likely not written)")}.");

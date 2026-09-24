@@ -39,7 +39,32 @@ public static class DemoFileLocator
         return demoRecordingEnabled && !sourceTvActive;
     }
 
-    /// <summary>Directories to look in, most specific first, without duplicates.</summary>
+    /// <summary>
+    /// The absolute path tv_record is given: &lt;game&gt;/csgo/&lt;demo path&gt;&lt;file name&gt;, with '/'
+    /// separators on every OS (Windows accepts them, and a game directory's backslashes are
+    /// converted).
+    ///
+    /// Issue #35: with a relative path, tv_record writes to the first writable Game search path.
+    /// Metamod puts csgo/addons/metamod first in gameinfo.gi, so demos landed in
+    /// csgo/addons/metamod/MatchZy/ while the plugin logged, and looked for them in, csgo/MatchZy/.
+    /// </summary>
+    public static string TvRecordPath(string gameDirectory, string? demoPath, string fileName)
+    {
+        string game = (gameDirectory ?? "").Replace('\\', '/').TrimEnd('/');
+        return $"{game}/csgo/{NormalizeDemoPath(demoPath)}{fileName}";
+    }
+
+    /// <summary>
+    /// The tv_record argument for <paramref name="path"/>: quoted only when it contains a space
+    /// (a Windows install under "Program Files"), so the usual Linux path is passed exactly as an
+    /// operator would type it.
+    /// </summary>
+    public static string TvRecordArgument(string path) => path.Contains(' ') ? $"\"{path}\"" : path;
+
+    /// <summary>
+    /// Directories to look in, most specific first, without duplicates. The csgo/addons/metamod
+    /// ones find demos that builds before 1.4.35 recorded there (see <see cref="TvRecordPath"/>).
+    /// </summary>
     public static IReadOnlyList<string> CandidateDirectories(string csgoDirectory, string expectedFullPath, string? demoPath)
     {
         var dirs = new List<string>();
@@ -51,9 +76,12 @@ public static class DemoFileLocator
             if (!dirs.Contains(norm)) dirs.Add(norm);
         }
 
+        string metamodDirectory = System.IO.Path.Join(csgoDirectory, "addons", "metamod");
         Add(System.IO.Path.GetDirectoryName(expectedFullPath));
         Add(System.IO.Path.Join(csgoDirectory, NormalizeDemoPath(demoPath)));
+        Add(System.IO.Path.Join(metamodDirectory, NormalizeDemoPath(demoPath)));
         Add(csgoDirectory);
+        Add(metamodDirectory);
         return dirs;
     }
 
