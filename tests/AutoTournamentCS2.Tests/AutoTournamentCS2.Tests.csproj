@@ -22,6 +22,7 @@
     <Compile Include="..\..\src\MatchRestartDelayLogic.cs" Link="MatchRestartDelayLogic.cs" />
     <Compile Include="..\..\src\ReadyLogic.cs" Link="ReadyLogic.cs" />
     <Compile Include="..\..\src\MapTargetLogic.cs" Link="MapTargetLogic.cs" />
+    <Compile Include="..\..\src\LegacyCarryOver.cs" Link="LegacyCarryOver.cs" />
   </ItemGroup>
 
   <ItemGroup>

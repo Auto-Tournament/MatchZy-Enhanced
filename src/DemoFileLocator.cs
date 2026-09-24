@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>A .dem file seen on disk.</summary>
 public sealed record DemoFileCandidate(string Path, DateTime LastWriteUtc);
@@ -20,7 +20,7 @@ public sealed record DemoFileCandidate(string Path, DateTime LastWriteUtc);
 public static class DemoFileLocator
 {
     /// <summary>
-    /// matchzy_demo_path relative to csgo/, always ending in '/' (or empty for csgo/ itself).
+    /// at_demo_path relative to csgo/, always ending in '/' (or empty for csgo/ itself).
     /// </summary>
     public static string NormalizeDemoPath(string? demoPath)
     {

@@ -4,17 +4,17 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Utils;
 
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
-        public async Task SendEventAsync(MatchZyEvent @event)
+        public async Task SendEventAsync(AutoTournamentCS2Event @event)
         {
             // Log and queue the ids carried by the event itself. Events are sent from
             // Task.Run, so matchConfig.CurrentMapNumber may already point at the next map
             // (map_result for map 0 used to be logged as mapNumber 1).
-            long eventMatchId = @event is MatchZyMatchEvent matchEvent ? matchEvent.MatchId : liveMatchId;
-            int eventMapNumber = @event is MatchZyMapEvent mapEvent ? mapEvent.MapNumber : matchConfig.CurrentMapNumber;
+            long eventMatchId = @event is AutoTournamentCS2MatchEvent matchEvent ? matchEvent.MatchId : liveMatchId;
+            int eventMapNumber = @event is AutoTournamentCS2MapEvent mapEvent ? mapEvent.MapNumber : matchConfig.CurrentMapNumber;
             try
             {
                 if (!eventsEnabled.Value) return;
@@ -24,7 +24,7 @@ namespace MatchZy
                 
                 // Print to server console, and optionally to chat for visibility
                 Server.NextFrame(() => {
-                    Server.PrintToConsole($"[MatchZy Events] Sending '{@event.EventName}' to {SecretRedactor.RedactText(matchConfig.RemoteLogURL)}");
+                    Server.PrintToConsole($"[Auto Tournament Events] Sending '{@event.EventName}' to {SecretRedactor.RedactText(matchConfig.RemoteLogURL)}");
                     if (debugChatEnabled.Value)
                     {
                         Server.PrintToChatAll($"{chatPrefix} {ChatColors.Grey}Event:{ChatColors.Default} {ChatColors.Lime}{@event.EventName}{ChatColors.Default} → {ChatColors.Grey}{GetShortUrl(matchConfig.RemoteLogURL)}");
@@ -51,7 +51,7 @@ namespace MatchZy
                     
                     // Print success to console, and optionally to chat
                     Server.NextFrame(() => {
-                        Server.PrintToConsole($"[MatchZy Events] ✓ '{@event.EventName}' sent successfully ({httpResponseMessage.StatusCode})");
+                        Server.PrintToConsole($"[Auto Tournament Events] ✓ '{@event.EventName}' sent successfully ({httpResponseMessage.StatusCode})");
                         if (debugChatEnabled.Value)
                         {
                             Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}✓{ChatColors.Default} {ChatColors.Lime}{@event.EventName}{ChatColors.Default} sent");
@@ -72,9 +72,9 @@ namespace MatchZy
                     
                     // Print error to console, and optionally to chat
                     Server.NextFrame(() => {
-                        Server.PrintToConsole($"[MatchZy Events] ✗ FAILED to send '{@event.EventName}' (HTTP {httpResponseMessage.StatusCode})");
-                        Server.PrintToConsole($"[MatchZy Events] Error: {SecretRedactor.RedactText(errorContent)}");
-                        Server.PrintToConsole($"[MatchZy Events] → Event queued for retry");
+                        Server.PrintToConsole($"[Auto Tournament Events] ✗ FAILED to send '{@event.EventName}' (HTTP {httpResponseMessage.StatusCode})");
+                        Server.PrintToConsole($"[Auto Tournament Events] Error: {SecretRedactor.RedactText(errorContent)}");
+                        Server.PrintToConsole($"[Auto Tournament Events] → Event queued for retry");
                         if (debugChatEnabled.Value)
                         {
                             Server.PrintToChatAll($"{chatPrefix} {ChatColors.Red}✗{ChatColors.Default} {ChatColors.Lime}{@event.EventName}{ChatColors.Default} {ChatColors.Red}FAILED{ChatColors.Default} ({httpResponseMessage.StatusCode}) - {ChatColors.Yellow}queued for retry");
@@ -101,8 +101,8 @@ namespace MatchZy
                 
                 // Print exception to console, and optionally to chat
                 Server.NextFrame(() => {
-                    Server.PrintToConsole($"[MatchZy Events] ✗ EXCEPTION sending '{@event.EventName}': {e.Message}");
-                    Server.PrintToConsole($"[MatchZy Events] → Event queued for retry");
+                    Server.PrintToConsole($"[Auto Tournament Events] ✗ EXCEPTION sending '{@event.EventName}': {e.Message}");
+                    Server.PrintToConsole($"[Auto Tournament Events] → Event queued for retry");
                     if (debugChatEnabled.Value)
                     {
                         Server.PrintToChatAll($"{chatPrefix} {ChatColors.Red}✗{ChatColors.Default} {ChatColors.Lime}{@event.EventName}{ChatColors.Default} {ChatColors.Red}ERROR:{ChatColors.Default} {e.Message} - {ChatColors.Yellow}queued for retry");
@@ -207,7 +207,7 @@ namespace MatchZy
                             
                             Server.NextFrame(() => {
                                 database.MarkEventSent(eventId);
-                                Server.PrintToConsole($"[MatchZy Events] ✓ Retry successful: '{eventType}' (attempt {attemptNumber})");
+                                Server.PrintToConsole($"[Auto Tournament Events] ✓ Retry successful: '{eventType}' (attempt {attemptNumber})");
                             });
                             
                             Log($"[EventRetryQueue] ✓ Event {eventId} ({eventType}) sent successfully on retry {attemptNumber}");

@@ -17,7 +17,7 @@ if [ -f ".env" ]; then
     set +a
 fi
 
-echo -e "${BLUE}🚀 MatchZy Automated Release Script${NC}\n"
+echo -e "${BLUE}🚀 Auto Tournament CS2 Automated Release Script${NC}\n"
 
 ensure_cmd() {
     local cmd="$1"
@@ -254,10 +254,10 @@ preflight_release_config() {
     fi
 }
 
-# Get current version from MatchZy.cs
-CURRENT_VERSION=$(grep "ModuleVersion =>" src/MatchZy.cs | sed -E "s/.*\"(.*)\".*/\1/")
+# Get current version from AutoTournamentCS2.cs
+CURRENT_VERSION=$(grep "ModuleVersion =>" src/AutoTournamentCS2.cs | sed -E "s/.*\"(.*)\".*/\1/")
 if [ -z "$CURRENT_VERSION" ]; then
-    echo -e "${RED}❌ Could not detect version from MatchZy.cs${NC}"
+    echo -e "${RED}❌ Could not detect version from AutoTournamentCS2.cs${NC}"
     exit 1
 fi
 
@@ -310,7 +310,7 @@ fi
 
 # Final confirmation before doing anything destructive
 echo -e "\n${YELLOW}You are about to run a release for version v${VERSION}.${NC}"
-echo -e "${YELLOW}This will clean builds, optionally update MatchZy.cs, commit, push, and create a GitHub release + tag.${NC}"
+echo -e "${YELLOW}This will clean builds, optionally update AutoTournamentCS2.cs, commit, push, and create a GitHub release + tag.${NC}"
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown-branch")
 echo -e "${YELLOW}Current Git branch: ${CURRENT_BRANCH}${NC}"
 read -rp "$(echo -e \"${YELLOW}Continue with release v${VERSION}? [y/N]: ${NC}\")" CONFIRM_RELEASE
@@ -338,16 +338,16 @@ if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Update version in MatchZy.cs BEFORE building (so the build includes the new version)
+# Update version in AutoTournamentCS2.cs BEFORE building (so the build includes the new version)
 if [ "$BUMP_TYPE" != "none" ]; then
-    echo -e "\n${BLUE}📝 Updating version in MatchZy.cs to ${VERSION}...${NC}"
+    echo -e "\n${BLUE}📝 Updating version in AutoTournamentCS2.cs to ${VERSION}...${NC}"
     # Use different sed syntax for Linux vs macOS
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i "" "s/ModuleVersion => \\\".*\\\"/ModuleVersion => \\\"${VERSION}\\\"/" src/MatchZy.cs
+        sed -i "" "s/ModuleVersion => \\\".*\\\"/ModuleVersion => \\\"${VERSION}\\\"/" src/AutoTournamentCS2.cs
     else
-        sed -i "s/ModuleVersion => \\\".*\\\"/ModuleVersion => \\\"${VERSION}\\\"/" src/MatchZy.cs
+        sed -i "s/ModuleVersion => \\\".*\\\"/ModuleVersion => \\\"${VERSION}\\\"/" src/AutoTournamentCS2.cs
     fi
-    echo -e "${GREEN}✓ Updated MatchZy.cs to version ${VERSION}${NC}"
+    echo -e "${GREEN}✓ Updated AutoTournamentCS2.cs to version ${VERSION}${NC}"
 fi
 
 # Clean previous builds
@@ -363,26 +363,43 @@ echo -e "\n${BLUE}🔨 Building project (Release mode)...${NC}"
 dotnet publish -c Release
 
 # Create release directory structure under build/
-RELEASE_DIR="MatchZy-${VERSION}"
+RELEASE_DIR="AutoTournamentCS2-${VERSION}"
 BUILD_ROOT="build"
 rm -rf "${BUILD_ROOT}/${RELEASE_DIR}" "${BUILD_ROOT}/${RELEASE_DIR}.zip"
-mkdir -p "${BUILD_ROOT}/${RELEASE_DIR}/addons/counterstrikesharp/plugins/MatchZy"
-mkdir -p "${BUILD_ROOT}/${RELEASE_DIR}/cfg/MatchZy"
+mkdir -p "${BUILD_ROOT}/${RELEASE_DIR}/addons/counterstrikesharp/plugins/AutoTournamentCS2"
+mkdir -p "${BUILD_ROOT}/${RELEASE_DIR}/cfg/AutoTournamentCS2"
 
 # Copy plugin files to proper directory structure
 echo -e "\n${BLUE}📂 Creating directory structure...${NC}"
-cp -r build/Release/net8.0/publish/* "${BUILD_ROOT}/${RELEASE_DIR}/addons/counterstrikesharp/plugins/MatchZy/"
+cp -r build/Release/net8.0/publish/* "${BUILD_ROOT}/${RELEASE_DIR}/addons/counterstrikesharp/plugins/AutoTournamentCS2/"
 
 # Copy config files
 echo -e "${BLUE}📂 Copying config files...${NC}"
-cp -r cfg/MatchZy/* "${BUILD_ROOT}/${RELEASE_DIR}/cfg/MatchZy/"
+cp -r cfg/AutoTournamentCS2/* "${BUILD_ROOT}/${RELEASE_DIR}/cfg/AutoTournamentCS2/"
+# database.json holds the operator's database connection. The plugin writes a default one on
+# first start when it is missing, so the zip leaves it out: extracting an update (or the 2.0.0
+# rename, which carries the old database.json over only when the new folder has none) must
+# never replace a MySQL setup with the SQLite default.
+rm -f "${BUILD_ROOT}/${RELEASE_DIR}/cfg/AutoTournamentCS2/database.json"
 
 # Create zip file
 echo -e "\n${BLUE}🗜️  Creating release archive...${NC}"
 mkdir -p "${BUILD_ROOT}"
 (
-  cd "${BUILD_ROOT}" && zip -r -q "${RELEASE_DIR}.zip" "${RELEASE_DIR}"
+  # Zip the contents, not the folder: addons/ and cfg/ sit at the root of the archive, so the
+  # plugin is at addons/counterstrikesharp/plugins/AutoTournamentCS2/AutoTournamentCS2.dll.
+  cd "${BUILD_ROOT}/${RELEASE_DIR}" && zip -r -q "../${RELEASE_DIR}.zip" addons cfg
 )
+
+# The layout csm and operators rely on. Fail before anything is committed or published.
+for required in \
+    "addons/counterstrikesharp/plugins/AutoTournamentCS2/AutoTournamentCS2.dll" \
+    "cfg/AutoTournamentCS2/config.cfg"; do
+    if ! unzip -l "${BUILD_ROOT}/${RELEASE_DIR}.zip" | awk '{print $4}' | grep -qx "$required"; then
+        echo -e "${RED}❌ ${RELEASE_DIR}.zip is missing ${required}${NC}"
+        exit 1
+    fi
+done
 
 # Get file size for display
 SIZE=$(du -h "${BUILD_ROOT}/${RELEASE_DIR}.zip" | cut -f1)
@@ -437,7 +454,7 @@ ${CHANGELOG}
 
 ## Configuration
 
-Config files are located in \`csgo/cfg/MatchZy/\`:
+Config files are located in \`csgo/cfg/AutoTournamentCS2/\`:
 - \`config.cfg\` - Main plugin configuration
 - \`admins.json\` - Admin permissions
 - \`database.json\` - Database settings

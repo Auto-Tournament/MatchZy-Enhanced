@@ -1,8 +1,8 @@
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>
 /// Pure ready-check rules with no CounterStrikeSharp dependency, so they can be
-/// unit tested outside the game server (see tests/MatchZy.Tests).
+/// unit tested outside the game server (see tests/AutoTournamentCS2.Tests).
 ///
 /// Team numbers are CS2's own: 1 = Spectator, 2 = Terrorist, 3 = CT. The
 /// [IsTeamReady] log line prints these raw numbers, which is why a log shows

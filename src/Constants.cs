@@ -1,4 +1,4 @@
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 class Constants
 {

@@ -8,9 +8,9 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using Timer = CounterStrikeSharp.API.Modules.Timers.Timer;
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
         private sealed class BootstrapPayload
         {
@@ -22,9 +22,9 @@ namespace MatchZy
         /// <summary>Runs debounce callbacks on the game thread through CounterStrikeSharp timers.</summary>
         private sealed class PluginTimerScheduler : IBootstrapScheduler
         {
-            private readonly MatchZy plugin;
+            private readonly AutoTournamentCS2 plugin;
 
-            public PluginTimerScheduler(MatchZy plugin) => this.plugin = plugin;
+            public PluginTimerScheduler(AutoTournamentCS2 plugin) => this.plugin = plugin;
 
             public IDisposable Schedule(TimeSpan delay, Action callback)
             {
@@ -55,42 +55,42 @@ namespace MatchZy
             StartBootstrapFetch,
             message => Log(message));
 
-        [ConsoleCommand("matchzy_bootstrap_url", "HTTP URL to fetch bootstrap config payload (server-only)")]
-        public void MatchZyBootstrapUrl(CCSPlayerController? player, CommandInfo command)
+        [ConsoleCommand("at_bootstrap_url", "HTTP URL to fetch bootstrap config payload (server-only)")]
+        public void AutoTournamentCS2BootstrapUrl(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
             string url = command.ArgByIndex(1);
 
             if (string.IsNullOrWhiteSpace(url))
             {
-                Log("[MatchZyBootstrapUrl] Usage: matchzy_bootstrap_url <url>");
+                Log("[AutoTournamentCS2BootstrapUrl] Usage: at_bootstrap_url <url>");
                 return;
             }
 
             string previous = bootstrapUrl;
             bootstrapUrl = url.Trim();
-            database.SaveConfigValue("matchzy_bootstrap_url", bootstrapUrl);
-            Log("[MatchZyBootstrapUrl] Bootstrap URL set and persisted to database");
+            database.SaveConfigValue("at_bootstrap_url", bootstrapUrl);
+            Log("[AutoTournamentCS2BootstrapUrl] Bootstrap URL set and persisted to database");
 
             ScheduleBootstrapFetch(previous, bootstrapUrl);
         }
 
-        [ConsoleCommand("matchzy_bootstrap_token", "Authentication token for bootstrap endpoint (sent as X-MatchZy-Token)")]
-        public void MatchZyBootstrapToken(CCSPlayerController? player, CommandInfo command)
+        [ConsoleCommand("at_bootstrap_token", "Authentication token for bootstrap endpoint (sent as X-Auto-Tournament-Token)")]
+        public void AutoTournamentCS2BootstrapToken(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
             string token = command.ArgByIndex(1);
 
             if (string.IsNullOrWhiteSpace(token))
             {
-                Log("[MatchZyBootstrapToken] Usage: matchzy_bootstrap_token <token>");
+                Log("[AutoTournamentCS2BootstrapToken] Usage: at_bootstrap_token <token>");
                 return;
             }
 
             string previous = bootstrapToken;
             bootstrapToken = token.Trim();
-            database.SaveConfigValue("matchzy_bootstrap_token", bootstrapToken);
-            Log("[MatchZyBootstrapToken] Bootstrap token set and persisted to database");
+            database.SaveConfigValue("at_bootstrap_token", bootstrapToken);
+            Log("[AutoTournamentCS2BootstrapToken] Bootstrap token set and persisted to database");
 
             ScheduleBootstrapFetch(previous, bootstrapToken);
         }
@@ -144,7 +144,7 @@ namespace MatchZy
                 try
                 {
                     using var httpClient = new HttpClient();
-                    httpClient.DefaultRequestHeaders.Add("X-MatchZy-Token", token);
+                    httpClient.DefaultRequestHeaders.Add("X-Auto-Tournament-Token", token);
 
                     var response = await httpClient.GetAsync(url);
                     var body = await response.Content.ReadAsStringAsync();

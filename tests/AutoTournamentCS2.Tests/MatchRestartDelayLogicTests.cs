@@ -1,7 +1,7 @@
-using MatchZy;
+using AutoTournamentCS2;
 using Xunit;
 
-namespace MatchZy.Tests;
+namespace AutoTournamentCS2.Tests;
 
 public class MatchRestartDelayLogicTests
 {

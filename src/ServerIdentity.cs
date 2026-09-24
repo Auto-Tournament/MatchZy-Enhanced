@@ -6,15 +6,15 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>Where a server's config scope came from, in preference order.</summary>
 public enum ScopeSource
 {
-    /// <summary><c>+matchzy_config_scope &lt;name&gt;</c> in the game process's start arguments.</summary>
+    /// <summary><c>+at_config_scope &lt;name&gt;</c> in the game process's start arguments.</summary>
     StartArgument,
 
-    /// <summary>The <c>matchzy_config_scope</c> convar (e.g. from config.cfg).</summary>
+    /// <summary>The <c>at_config_scope</c> convar (e.g. from config.cfg).</summary>
     Convar,
 
     /// <summary><c>-port &lt;n&gt;</c> in the game process's start arguments.</summary>
@@ -45,11 +45,11 @@ public sealed record ScopeResolution(string Scope, ScopeSource Source, bool IsFi
     public string Description => Source switch
     {
         ScopeSource.StartArgument => "from start argument",
-        ScopeSource.Convar => "from matchzy_config_scope convar",
+        ScopeSource.Convar => "from at_config_scope convar",
         ScopeSource.CommandLinePort => "from -port start argument",
         ScopeSource.HostportConvar => "from hostport convar",
-        ScopeSource.InstallPathFallback => "FALLBACK from install path - no matchzy_config_scope and no game port found",
-        ScopeSource.ProcessFallback => "FALLBACK from process id - no matchzy_config_scope, no game port and no install path found; config will not survive a restart",
+        ScopeSource.InstallPathFallback => "FALLBACK from install path - no at_config_scope and no game port found",
+        ScopeSource.ProcessFallback => "FALLBACK from process id - no at_config_scope, no game port and no install path found; config will not survive a restart",
         _ => Source.ToString(),
     };
 }
@@ -60,7 +60,7 @@ public sealed class ScopeInputs
     /// <summary>The game process's argv, ideally from <c>/proc/self/cmdline</c>.</summary>
     public string[]? CommandLineArgs { get; init; }
 
-    /// <summary>Current value of the <c>matchzy_config_scope</c> convar.</summary>
+    /// <summary>Current value of the <c>at_config_scope</c> convar.</summary>
     public string? ConvarScope { get; init; }
 
     /// <summary>Current value of the <c>ip</c> convar.</summary>
@@ -87,13 +87,13 @@ public sealed class ScopeInputs
 /// <summary>
 /// Derives the stable identity that scopes this server's rows in the shared database.
 ///
-/// Several MatchZy servers on one box normally share a single MySQL database, but per-server
+/// Several Auto Tournament CS2 servers on one box normally share a single MySQL database, but per-server
 /// values (server id, bootstrap URL and token, remote log URL and header, demo upload URL) are
-/// stored in <c>matchzy_server_config</c>, so each row carries the server's scope.
+/// stored in <c>at_server_config</c>, so each row carries the server's scope.
 ///
 /// Resolution order:
-///   1. <c>+matchzy_config_scope &lt;name&gt;</c> in the game process's start arguments.
-///   2. The <c>matchzy_config_scope</c> convar.
+///   1. <c>+at_config_scope &lt;name&gt;</c> in the game process's start arguments.
+///   2. The <c>at_config_scope</c> convar.
 ///   3. The bind address and <c>-port</c> from the start arguments.
 ///   4. The <c>hostport</c> convar, only once the server has activated.
 ///   5. A fallback that is still distinct per server (install path, else process id), with a
@@ -102,7 +102,7 @@ public sealed class ScopeInputs
 /// The start arguments are read from <c>/proc/self/cmdline</c> on Linux.
 /// <see cref="Environment.GetCommandLineArgs"/> is not usable there: CounterStrikeSharp hosts
 /// .NET inside the cs2 process through hostfxr, so the runtime never sees the game's argv. That
-/// is why 1.4.26 found neither <c>-port</c> nor <c>+matchzy_config_scope</c> and resolved every
+/// is why 1.4.26 found neither <c>-port</c> nor <c>+at_config_scope</c> and resolved every
 /// server to <c>&lt;host&gt;:27015</c>. On Windows the managed args come from the process command
 /// line, so they are used as the fallback there.
 /// </summary>
@@ -138,7 +138,7 @@ public static class ServerIdentity
     private static readonly string[] IpFlags = { "-ip", "+ip" };
 
     /// <summary>Command line flags that carry an explicit scope override.</summary>
-    private static readonly string[] ScopeFlags = { "+matchzy_config_scope", "-matchzy_config_scope" };
+    private static readonly string[] ScopeFlags = { "+at_config_scope", "-at_config_scope" };
 
     /// <summary>
     /// Full resolution, see the class summary for the order. <see cref="ScopeResolution.IsFinal"/>
@@ -284,8 +284,8 @@ public static class ServerIdentity
     public static string? ParseBindIp(string[]? args) => ValueOfFlag(args, IpFlags);
 
     /// <summary>
-    /// Reads an explicit scope override (<c>+matchzy_config_scope &lt;name&gt;</c> or
-    /// <c>+matchzy_config_scope=&lt;name&gt;</c>). Null when absent or empty.
+    /// Reads an explicit scope override (<c>+at_config_scope &lt;name&gt;</c> or
+    /// <c>+at_config_scope=&lt;name&gt;</c>). Null when absent or empty.
     /// </summary>
     public static string? ParseScopeOverride(string[]? args) => ValueOfFlag(args, ScopeFlags);
 
@@ -316,7 +316,7 @@ public static class ServerIdentity
     /// Returns the value of the first of <paramref name="flags"/> present, as either
     /// <c>flag value</c> or <c>flag=value</c>. Flags are matched whole, so <c>+tv_port</c> never
     /// matches <c>-port</c>. The argument after a flag is not taken as its value when it is
-    /// itself a flag (starts with '+' or '-'), so <c>+matchzy_config_scope +map de_dust2</c> has
+    /// itself a flag (starts with '+' or '-'), so <c>+at_config_scope +map de_dust2</c> has
     /// no scope rather than the scope "+map". Index 0 (the executable) is never a flag.
     /// </summary>
     private static string? ValueOfFlag(string[]? args, string[] flags)

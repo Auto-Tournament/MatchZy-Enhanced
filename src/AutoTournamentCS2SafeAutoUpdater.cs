@@ -10,14 +10,14 @@ using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Commands;
 using Microsoft.Extensions.Logging;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>
-/// MatchZy-aware CS2 auto-updater that NEVER restarts while a MatchZy match is in progress.
-/// It only restarts when matchzy_tournament_status is in a safe state (idle/postgame/error).
-/// Implemented as part of the main MatchZy plugin.
+/// Match-aware CS2 auto-updater that NEVER restarts while an Auto Tournament CS2 match is in progress.
+/// It only restarts when at_tournament_status is in a safe state (idle/postgame/error).
+/// Implemented as part of the main Auto Tournament CS2 plugin.
 /// </summary>
-public partial class MatchZy
+public partial class AutoTournamentCS2
 {
 
     private const string SteamApiEndpoint =
@@ -35,17 +35,17 @@ public partial class MatchZy
     private static double _nextUpdateCheckAllowedTime;
     private static bool _offlineWarningLogged;
 
-    // Cvars we care about from MatchZy
-    private static ConVar? _matchzyTournamentStatus;
-    private static ConVar? _matchzyTournamentMatch;
+    // Cvars we care about from Auto Tournament CS2
+    private static ConVar? _atTournamentStatus;
+    private static ConVar? _atTournamentMatch;
 
     /// <summary>
-    /// Initialize the MatchZy-safe auto-updater. Called from MatchZy.Load().
+    /// Initialize the match-safe auto-updater. Called from AutoTournamentCS2.Load().
     /// </summary>
-    private void InitializeMatchZySafeAutoUpdater()
+    private void InitializeAutoTournamentCS2SafeAutoUpdater()
     {
-        _matchzyTournamentStatus = ConVar.Find("matchzy_tournament_status");
-        _matchzyTournamentMatch = ConVar.Find("matchzy_tournament_match");
+        _atTournamentStatus = ConVar.Find("at_tournament_status");
+        _atTournamentMatch = ConVar.Find("at_tournament_match");
 
         RegisterListener<Listeners.OnGameServerSteamAPIActivated>(OnGameServerSteamAPIActivated);
 
@@ -55,7 +55,7 @@ public partial class MatchZy
 
     private void OnGameServerSteamAPIActivated()
     {
-        Logger.LogInformation("[MatchZySafeAutoUpdater] Steam API activated. MatchZy-safe update checks enabled.");
+        Logger.LogInformation("[AutoTournamentCS2SafeAutoUpdater] Steam API activated. Match-safe update checks enabled.");
         _offlineWarningLogged = false;
     }
 
@@ -87,9 +87,9 @@ public partial class MatchZy
                 // best-effort
             }
 
-            // Never perform update checks while a MatchZy match is in progress; this keeps
+            // Never perform update checks while an Auto Tournament CS2 match is in progress; this keeps
             // all Steam API polling and restart decisions strictly outside live matches.
-            string status = GetMatchZyStatus();
+            string status = GetAutoTournamentCS2Status();
             if (IsMatchInProgress(status))
             {
                 return;
@@ -111,13 +111,13 @@ public partial class MatchZy
         }
         catch (Exception ex)
         {
-            Logger.LogError("[MatchZySafeAutoUpdater] Error scheduling update check: {Message}", ex.Message);
+            Logger.LogError("[AutoTournamentCS2SafeAutoUpdater] Error scheduling update check: {Message}", ex.Message);
         }
     }
 
     /// <summary>
     /// Performs the actual Steam UpToDateCheck and, if an update is available, schedules a
-    /// shutdown that respects MatchZy's tournament status.
+    /// shutdown that respects Auto Tournament CS2's tournament status.
     /// </summary>
     private async Task CheckServerVersionAndMaybeScheduleShutdownAsync()
     {
@@ -137,7 +137,7 @@ public partial class MatchZy
         }
         catch (Exception ex)
         {
-            Logger.LogError("[MatchZySafeAutoUpdater] Error while checking for updates: {Message}", ex.Message);
+            Logger.LogError("[AutoTournamentCS2SafeAutoUpdater] Error while checking for updates: {Message}", ex.Message);
         }
     }
 
@@ -150,16 +150,16 @@ public partial class MatchZy
 
             // Log a clear, machine-parseable marker for external server managers.
             // Your manager can watch for this exact string:
-            //   [MATCHZY_UPDATE_AVAILABLE] required_version=<number>
-            Logger.LogInformation("[MatchZySafeAutoUpdater] New CS2 update released (Required version: {Version})", _requiredVersion);
-            Logger.LogInformation("[MATCHZY_UPDATE_AVAILABLE] required_version={Version}", _requiredVersion);
+            //   [AT_UPDATE_AVAILABLE] required_version=<number>
+            Logger.LogInformation("[AutoTournamentCS2SafeAutoUpdater] New CS2 update released (Required version: {Version})", _requiredVersion);
+            Logger.LogInformation("[AT_UPDATE_AVAILABLE] required_version={Version}", _requiredVersion);
 
             // Notify remote API (if configured) so admins get a clear warning.
             try
             {
                 if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL) && !string.IsNullOrEmpty(matchReportServerId.Value))
                 {
-                    var ev = new MatchZyCs2UpdateRequiredEvent
+                    var ev = new AutoTournamentCS2Cs2UpdateRequiredEvent
                     {
                         MatchId = -1,
                         ServerId = matchReportServerId.Value,
@@ -194,49 +194,49 @@ public partial class MatchZy
 
         _restartRequired = true;
 
-        // Try to shut down, but respect MatchZy’s status.
-        TryShutdownRespectingMatchZy();
+        // Try to shut down, but respect Auto Tournament CS2's status.
+        TryShutdownRespectingAutoTournamentCS2();
     }
 
     /// <summary>
-    /// Attempts to shut down the server. If MatchZy reports a live/active match,
+    /// Attempts to shut down the server. If Auto Tournament CS2 reports a live/active match,
     /// we defer and reschedule instead of quitting.
     /// </summary>
-    private void TryShutdownRespectingMatchZy()
+    private void TryShutdownRespectingAutoTournamentCS2()
     {
         if (!_restartRequired)
         {
             return;
         }
 
-        string status = GetMatchZyStatus();
-        string matchSlug = GetMatchZyMatchSlug();
+        string status = GetAutoTournamentCS2Status();
+        string matchSlug = GetAutoTournamentCS2MatchSlug();
 
         if (IsMatchInProgress(status))
         {
             Logger.LogInformation(
-                "[MatchZySafeAutoUpdater] Update available (version {Version}), but MatchZy status is '{Status}' for match '{MatchSlug}'. Deferring shutdown.",
+                "[AutoTournamentCS2SafeAutoUpdater] Update available (version {Version}), but Auto Tournament CS2 status is '{Status}' for match '{MatchSlug}'. Deferring shutdown.",
                 _requiredVersion, status, string.IsNullOrEmpty(matchSlug) ? "<none>" : matchSlug
             );
 
             // Reschedule another check after a delay; we keep doing this until status is safe.
-            AddTimer(ShutdownRetryDelaySeconds, TryShutdownRespectingMatchZy, TimerFlags.STOP_ON_MAPCHANGE);
+            AddTimer(ShutdownRetryDelaySeconds, TryShutdownRespectingAutoTournamentCS2, TimerFlags.STOP_ON_MAPCHANGE);
             return;
         }
 
         Logger.LogInformation(
-            "[MatchZySafeAutoUpdater] MatchZy status is '{Status}' (safe). Preparing server shutdown for CS2 update {Version}.",
+            "[AutoTournamentCS2SafeAutoUpdater] Auto Tournament CS2 status is '{Status}' (safe). Preparing server shutdown for CS2 update {Version}.",
             status, _requiredVersion
         );
 
         PrepareServerShutdown();
     }
 
-    private string GetMatchZyStatus()
+    private string GetAutoTournamentCS2Status()
     {
         try
         {
-            return _matchzyTournamentStatus?.GetPrimitiveValue<string>() ?? "idle";
+            return _atTournamentStatus?.GetPrimitiveValue<string>() ?? "idle";
         }
         catch
         {
@@ -244,11 +244,11 @@ public partial class MatchZy
         }
     }
 
-    private string GetMatchZyMatchSlug()
+    private string GetAutoTournamentCS2MatchSlug()
     {
         try
         {
-            return _matchzyTournamentMatch?.GetPrimitiveValue<string>() ?? "";
+            return _atTournamentMatch?.GetPrimitiveValue<string>() ?? "";
         }
         catch
         {
@@ -257,7 +257,7 @@ public partial class MatchZy
     }
 
     /// <summary>
-    /// Treat these MatchZy statuses as "match in progress" and never restart during them.
+    /// Treat these Auto Tournament CS2 statuses as "match in progress" and never restart during them.
     /// </summary>
     private static bool IsMatchInProgress(string status)
     {
@@ -284,8 +284,8 @@ public partial class MatchZy
     {
         if (!IsServerSafeToShutdownNow())
         {
-            Logger.LogWarning("[MatchZySafeAutoUpdater] Shutdown aborted: MatchZy internal state is not safe yet. Will retry.");
-            AddTimer(ShutdownRetryDelaySeconds, TryShutdownRespectingMatchZy, TimerFlags.STOP_ON_MAPCHANGE);
+            Logger.LogWarning("[AutoTournamentCS2SafeAutoUpdater] Shutdown aborted: Auto Tournament CS2 internal state is not safe yet. Will retry.");
+            AddTimer(ShutdownRetryDelaySeconds, TryShutdownRespectingAutoTournamentCS2, TimerFlags.STOP_ON_MAPCHANGE);
             return;
         }
 
@@ -320,22 +320,22 @@ public partial class MatchZy
     {
         if (!IsServerSafeToShutdownNow())
         {
-            Logger.LogWarning("[MatchZySafeAutoUpdater] Final shutdown step aborted: server no longer in a safe state. Deferring.");
-            AddTimer(ShutdownRetryDelaySeconds, TryShutdownRespectingMatchZy, TimerFlags.STOP_ON_MAPCHANGE);
+            Logger.LogWarning("[AutoTournamentCS2SafeAutoUpdater] Final shutdown step aborted: server no longer in a safe state. Deferring.");
+            AddTimer(ShutdownRetryDelaySeconds, TryShutdownRespectingAutoTournamentCS2, TimerFlags.STOP_ON_MAPCHANGE);
             return;
         }
 
         // Second machine-parseable marker indicating that we are actually quitting now:
-        //   [MATCHZY_UPDATE_SHUTDOWN] required_version=<number>
-        Logger.LogInformation("[MatchZySafeAutoUpdater] Initiating server shutdown for CS2 update {Version}.", _requiredVersion);
-        Logger.LogInformation("[MATCHZY_UPDATE_SHUTDOWN] required_version={Version}", _requiredVersion);
+        //   [AT_UPDATE_SHUTDOWN] required_version=<number>
+        Logger.LogInformation("[AutoTournamentCS2SafeAutoUpdater] Initiating server shutdown for CS2 update {Version}.", _requiredVersion);
+        Logger.LogInformation("[AT_UPDATE_SHUTDOWN] required_version={Version}", _requiredVersion);
 
         // Notify remote API (if configured) that shutdown is imminent.
         try
         {
             if (!string.IsNullOrEmpty(matchConfig.RemoteLogURL) && !string.IsNullOrEmpty(matchReportServerId.Value))
             {
-                var ev = new MatchZyCs2UpdateRequiredEvent
+                var ev = new AutoTournamentCS2Cs2UpdateRequiredEvent
                 {
                     MatchId = -1,
                     ServerId = matchReportServerId.Value,
@@ -357,7 +357,7 @@ public partial class MatchZy
     {
         try
         {
-            string status = GetMatchZyStatus();
+            string status = GetAutoTournamentCS2Status();
             if (IsMatchInProgress(status))
             {
                 return false;
@@ -392,19 +392,19 @@ public partial class MatchZy
     /// Console command: manually check if the server is up to date and print the result.
     /// Does NOT schedule a restart; purely informational.
     /// </summary>
-    [ConsoleCommand("matchzy_check_for_updates", "Check whether this CS2 server is up to date according to Steam.")]
-    public void MatchZyCheckForUpdates(CCSPlayerController? player, CommandInfo command)
+    [ConsoleCommand("at_check_for_updates", "Check whether this CS2 server is up to date according to Steam.")]
+    public void AutoTournamentCS2CheckForUpdates(CCSPlayerController? player, CommandInfo command)
     {
         // Run the check on the next frame to keep the command handler light.
         Server.NextFrame(async () =>
         {
-            string prefix = "[MatchZyUpToDate]";
+            string prefix = "[AutoTournamentCS2UpToDate]";
 
             try
             {
                 if (!safeAutoUpdaterEnabled.Value)
                 {
-                    string disabled = $"{prefix} Update checks are disabled (matchzy_safeautoupdater_enabled 0).";
+                    string disabled = $"{prefix} Update checks are disabled (at_safeautoupdater_enabled 0).";
                     if (player != null && player.IsValid)
                     {
                         player.PrintToChat($" {disabled}");
@@ -420,7 +420,7 @@ public partial class MatchZy
 
                 string msg = upToDate
                     ? $"{prefix} Server is up to date."
-                    : $"{prefix} Update available. Required version: {requiredVersion}. The auto-updater will restart once MatchZy is idle/postgame.";
+                    : $"{prefix} Update available. Required version: {requiredVersion}. The auto-updater will restart once Auto Tournament CS2 is idle/postgame.";
 
                 if (player != null && player.IsValid)
                 {
@@ -515,7 +515,7 @@ public partial class MatchZy
 
         if (!File.Exists(steamInfPath))
         {
-            Logger.LogError("[MatchZySafeAutoUpdater] steam.inf not found at {Path}.", steamInfPath);
+            Logger.LogError("[AutoTournamentCS2SafeAutoUpdater] steam.inf not found at {Path}.", steamInfPath);
             return string.Empty;
         }
 
@@ -529,12 +529,12 @@ public partial class MatchZy
                 return match.Groups["version"].Value;
             }
 
-            Logger.LogError("[MatchZySafeAutoUpdater] Could not find PatchVersion key in {Path}.", steamInfPath);
+            Logger.LogError("[AutoTournamentCS2SafeAutoUpdater] Could not find PatchVersion key in {Path}.", steamInfPath);
             return string.Empty;
         }
         catch (Exception ex)
         {
-            Logger.LogError("[MatchZySafeAutoUpdater] Error reading steam.inf: {Message}", ex.Message);
+            Logger.LogError("[AutoTournamentCS2SafeAutoUpdater] Error reading steam.inf: {Message}", ex.Message);
             return string.Empty;
         }
     }
@@ -552,7 +552,7 @@ public partial class MatchZy
         {
             _offlineWarningLogged = true;
             Logger.LogWarning(
-                "[MatchZySafeAutoUpdater] Steam update check failed (DNS/network/offline): {Message}. Backing off for {BackoffSeconds}s. (Disable with matchzy_safeautoupdater_enabled 0)",
+                "[AutoTournamentCS2SafeAutoUpdater] Steam update check failed (DNS/network/offline): {Message}. Backing off for {BackoffSeconds}s. (Disable with at_safeautoupdater_enabled 0)",
                 ex.Message,
                 backoffSeconds
             );

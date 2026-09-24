@@ -1,8 +1,8 @@
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>
 /// Pure match-outcome rules with no CounterStrikeSharp dependency, so they can be
-/// unit tested outside the game server (see tests/MatchZy.Tests).
+/// unit tested outside the game server (see tests/AutoTournamentCS2.Tests).
 ///
 /// Conventions used throughout:
 /// - Team slots are "team1" / "team2" (or "none" for no winner).

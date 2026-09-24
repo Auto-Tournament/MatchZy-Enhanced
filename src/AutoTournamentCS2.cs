@@ -7,21 +7,21 @@ using CounterStrikeSharp.API.Modules.Events;
 using CounterStrikeSharp.API.Modules.Timers;
 
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
     [MinimumApiVersion(227)]
-    public partial class MatchZy : BasePlugin
+    public partial class AutoTournamentCS2 : BasePlugin
     {
 
-        public override string ModuleName => "MatchZy";
+        public override string ModuleName => "Auto Tournament CS2";
 
-        public override string ModuleVersion => "1.4.34";
+        public override string ModuleVersion => "2.0.0";
 
         public override string ModuleAuthor => "sivert (https://github.com/sivert-io/)";
 
         public override string ModuleDescription => "Enhanced CS2 match management plugin optimized for tournament automation with event reliability, server tracking, and advanced player features!";
 
-        public string chatPrefix = $"[{ChatColors.Green}MatchZy{ChatColors.Default}]";
+        public string chatPrefix = $"[{ChatColors.Green}Auto Tournament{ChatColors.Default}]";
         public string adminChatPrefix = $"[{ChatColors.Red}ADMIN{ChatColors.Default}]";
 
         // Plugin start phase data
@@ -136,7 +136,7 @@ namespace MatchZy
         public int sideSelectionRemainingSeconds = 0;
 
         // Each message is kept in chat display for ~13 seconds, hence setting default chat timer to 13 seconds.
-        // Configurable using matchzy_chat_messages_timer_delay <seconds>
+        // Configurable using at_chat_messages_timer_delay <seconds>
         public int chatTimerDelay = 13;
 
         // Game Config
@@ -155,15 +155,46 @@ namespace MatchZy
         // SQLite/MySQL Database 
         private Database database = new();
 
+        /// <summary>
+        /// Moves the config folder and SQLite file of an install older than 2.0.0 to their new names.
+        /// The tables and saved settings are carried over when the database opens. Failures are
+        /// logged and never stop the plugin from loading.
+        /// </summary>
+        private void CarryOverLegacyInstall()
+        {
+            static void CarryOverLog(string message) => Console.WriteLine("[Auto Tournament] " + message);
+
+            try
+            {
+                LegacyCarryOver.CarryOverConfigFolder(Path.Combine(Server.GameDirectory, "csgo", "cfg"), CarryOverLog);
+            }
+            catch (Exception ex)
+            {
+                CarryOverLog($"[CarryOver] ERROR moving the old config folder: {ex.Message}");
+            }
+
+            try
+            {
+                LegacyCarryOver.CarryOverSqliteFile(ModuleDirectory, CarryOverLog);
+            }
+            catch (Exception ex)
+            {
+                CarryOverLog($"[CarryOver] ERROR renaming the old SQLite database: {ex.Message}");
+            }
+        }
+
         public override void Load(bool hotReload)
         {
+            // Before anything reads cfg/AutoTournamentCS2/ or opens the database: carry an install
+            // from before the rename over to the new names, once.
+            CarryOverLegacyInstall();
 
             LoadAdmins();
 
             database.InitializeDatabase(ModuleDirectory);
 
             // This sets default config ConVars
-            Server.ExecuteCommand("execifexists MatchZy/config.cfg");
+            Server.ExecuteCommand("execifexists AutoTournamentCS2/config.cfg");
 
             // Persistent config is scoped per server so several servers can share one database.
             // The scope is resolved lazily on first use. Its start arguments are read from
@@ -175,7 +206,7 @@ namespace MatchZy
             database.ScopeProvider = ResolveServerConfigScope;
 
             // Load persistent configuration from database (overrides config.cfg if values exist).
-            // When the start arguments identify this server (+matchzy_config_scope or -port) that
+            // When the start arguments identify this server (+at_config_scope or -port) that
             // is safe now. Otherwise the scope depends on config.cfg or hostport, neither of which
             // the engine has applied yet during Load, so wait for the first OnMapStart.
             if (hotReload || ServerIdentity.HasCommandLineIdentity(processCommandLineArgs))
@@ -185,7 +216,7 @@ namespace MatchZy
             else
             {
                 persistentConfigLoadPending = true;
-                Log($"[ConfigScope] No +matchzy_config_scope or -port in the start arguments (read from {commandLineSource}); loading persistent config after the server activates.");
+                Log($"[ConfigScope] No +at_config_scope or -port in the start arguments (read from {commandLineSource}); loading persistent config after the server activates.");
             }
 
             // Start event retry background process
@@ -254,10 +285,10 @@ namespace MatchZy
                 }
             }, TimerFlags.REPEAT);
 
-            teamSides[matchzyTeam1] = "CT";
-            teamSides[matchzyTeam2] = "TERRORIST";
-            reverseTeamSides["CT"] = matchzyTeam1;
-            reverseTeamSides["TERRORIST"] = matchzyTeam2;
+            teamSides[atTeam1] = "CT";
+            teamSides[atTeam2] = "TERRORIST";
+            reverseTeamSides["CT"] = atTeam1;
+            reverseTeamSides["TERRORIST"] = atTeam2;
 
             if (!hotReload)
             {
@@ -271,9 +302,9 @@ namespace MatchZy
                 AutoStart();
             }
 
-            // Initialize the MatchZy-safe auto-updater (Steam UpToDateCheck) that will never
-            // restart the server while a MatchZy match is in progress.
-            InitializeMatchZySafeAutoUpdater();
+            // Initialize the match-safe auto-updater (Steam UpToDateCheck) that will never
+            // restart the server while an Auto Tournament CS2 match is in progress.
+            InitializeAutoTournamentCS2SafeAutoUpdater();
 
             commandActions = new Dictionary<string, Action<CCSPlayerController?, CommandInfo?>> {
                 { ".ready", OnPlayerReady },
@@ -370,8 +401,8 @@ namespace MatchZy
                 { ".worsttspawn", OnWorstTSpawnCommand },
                 { ".savepos", OnSavePosCommand},
                 { ".loadpos", OnLoadPosCommand},
-                { ".version", OnMatchZyVersionCommand},
-                { ".matchzyversion", OnMatchZyVersionCommand},
+                { ".version", OnAutoTournamentCS2VersionCommand},
+                { ".atversion", OnAutoTournamentCS2VersionCommand},
                 { ".te", OnTestEventCommand},
                 { ".testevent", OnTestEventCommand},
                 { ".gg", OnGGCommand}
@@ -397,7 +428,7 @@ namespace MatchZy
                 CCSPlayerController? player = @event.Userid;
                 if (!IsPlayerValid(player)) return HookResult.Continue;
 
-                if (matchzyTeam1.coach.Contains(player!) || matchzyTeam2.coach.Contains(player!))
+                if (atTeam1.coach.Contains(player!) || atTeam2.coach.Contains(player!))
                 {
                     @event.Silent = true;
                     return HookResult.Changed;
@@ -504,12 +535,12 @@ namespace MatchZy
 
                 // Send knife_round_ended event
                 string winnerTeam = knifeWinner == 3 ?
-                    (reverseTeamSides.ContainsKey("CT") ? (reverseTeamSides["CT"] == matchzyTeam1 ? "team1" : "team2") : "none") :
-                    (reverseTeamSides.ContainsKey("TERRORIST") ? (reverseTeamSides["TERRORIST"] == matchzyTeam1 ? "team1" : "team2") : "none");
+                    (reverseTeamSides.ContainsKey("CT") ? (reverseTeamSides["CT"] == atTeam1 ? "team1" : "team2") : "none") :
+                    (reverseTeamSides.ContainsKey("TERRORIST") ? (reverseTeamSides["TERRORIST"] == atTeam1 ? "team1" : "team2") : "none");
 
                 Log($"[EventRoundEnd] Knife round ended, sending knife_round_ended event - winner: {winnerTeam}");
 
-                var knifeEndedEvent = new MatchZyKnifeRoundEndedEvent
+                var knifeEndedEvent = new AutoTournamentCS2KnifeRoundEndedEvent
                 {
                     MatchId = liveMatchId,
                     MapNumber = matchConfig.CurrentMapNumber,
@@ -668,7 +699,7 @@ namespace MatchZy
                 {
                     int damage = @event.DmgHealth;
                     int postDamageHealth = @event.Health;
-                    PrintToPlayerChat(attacker!, Localizer["matchzy.pracc.damage", damage, victim.PlayerName, postDamageHealth]);
+                    PrintToPlayerChat(attacker!, Localizer["at.pracc.damage", damage, victim.PlayerName, postDamageHealth]);
                     return HookResult.Continue;
                 }
 
@@ -752,7 +783,7 @@ namespace MatchZy
                         else
                         {
                             // ReplyToUserCommand(player, "Usage: .asay <message>");
-                            ReplyToUserCommand(player, Localizer["matchzy.cc.usage", ".asay <message>"]);
+                            ReplyToUserCommand(player, Localizer["at.cc.usage", ".asay <message>"]);
                         }
                     }
                     else
@@ -851,7 +882,7 @@ namespace MatchZy
                 if (attacker!.IsValid)
                 {
                     double roundedBlindDuration = Math.Round(@event.BlindDuration, 2);
-                    PrintToPlayerChat(attacker, Localizer["matchzy.pracc.blind", player!.PlayerName, roundedBlindDuration]);
+                    PrintToPlayerChat(attacker, Localizer["at.pracc.blind", player!.PlayerName, roundedBlindDuration]);
                 }
                 var userId = player!.UserId;
                 if (userId != null && noFlashList.Contains((int)userId))
@@ -868,7 +899,7 @@ namespace MatchZy
             RegisterEventHandler<EventMolotovDetonate>(EventMolotovDetonateHandler);
             RegisterEventHandler<EventDecoyStarted>(EventDecoyDetonateHandler);
 
-            Console.WriteLine($"[{ModuleName} v{ModuleVersion} LOADED] MatchZy Enhanced by {ModuleAuthor}");
+            Console.WriteLine($"[{ModuleName} v{ModuleVersion} LOADED] by {ModuleAuthor}");
         }
     }
 }

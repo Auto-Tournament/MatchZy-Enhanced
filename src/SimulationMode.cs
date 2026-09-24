@@ -8,13 +8,13 @@ using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Newtonsoft.Json.Linq;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 // Internal identity for a simulated player: the "real" identity from the match JSON
 // that a given in-game bot is representing.
 internal record SimulationPlayerIdentity(string ConfigSteamId, string ConfigName, string TeamSlot);
 
-public partial class MatchZy
+public partial class AutoTournamentCS2
 {
     // Mapping from CS2 userId -> configured player identity for simulation mode.
     private readonly Dictionary<int, SimulationPlayerIdentity> simulationPlayersByUserId = new();
@@ -136,7 +136,7 @@ public partial class MatchZy
             return;
         }
 
-        string team1Side = teamSides.TryGetValue(matchzyTeam1, out var side1) ? side1 : "CT";
+        string team1Side = teamSides.TryGetValue(atTeam1, out var side1) ? side1 : "CT";
 
         var liveControllers = new Dictionary<int, CCSPlayerController>();
         var liveBots = new List<SimLiveBot>();
@@ -204,7 +204,7 @@ public partial class MatchZy
         {
             if (string.IsNullOrEmpty(matchConfig.RemoteLogURL) || !isMatchSetup) break;
             var info = BuildPlayerInfo(liveControllers[uid], "none");
-            var connectEvent = new MatchZyPlayerConnectedEvent { MatchId = liveMatchId, Player = info };
+            var connectEvent = new AutoTournamentCS2PlayerConnectedEvent { MatchId = liveMatchId, Player = info };
             Task.Run(async () => { await SendEventAsync(connectEvent); });
         }
 
@@ -370,8 +370,8 @@ public partial class MatchZy
             }
         }
 
-        AddFromTeam(matchzyTeam1.teamPlayers, "team1");
-        AddFromTeam(matchzyTeam2.teamPlayers, "team2");
+        AddFromTeam(atTeam1.teamPlayers, "team1");
+        AddFromTeam(atTeam2.teamPlayers, "team2");
 
         Log($"[SimulationMode] Built simulation config players - total: {simulationIdentityPool.Count}");
     }
@@ -399,7 +399,7 @@ public partial class MatchZy
         // newest-first, so assigning from the pool in order put team1's identities on the
         // bots of team2's side. Every player-stat payload (round_end team1/team2 players)
         // then listed the other team's names.
-        string team1Side = teamSides.TryGetValue(matchzyTeam1, out var side1) ? side1 : "CT";
+        string team1Side = teamSides.TryGetValue(atTeam1, out var side1) ? side1 : "CT";
         string? botSlot = MatchLogic.SlotForTeamNum(player.TeamNum, team1Side);
         if (botSlot == null && !allowUnassignedTeam)
         {
@@ -453,17 +453,17 @@ public partial class MatchZy
     }
 
     /// <summary>
-    /// Helper to build MatchZyPlayerInfo, respecting simulation mappings when enabled.
+    /// Helper to build AutoTournamentCS2PlayerInfo, respecting simulation mappings when enabled.
     /// </summary>
-    private MatchZyPlayerInfo BuildPlayerInfo(CCSPlayerController player, string teamLabelFallback)
+    private AutoTournamentCS2PlayerInfo BuildPlayerInfo(CCSPlayerController player, string teamLabelFallback)
     {
         if (isSimulationMode && player.UserId.HasValue &&
             simulationPlayersByUserId.TryGetValue(player.UserId.Value, out var identity))
         {
-            return new MatchZyPlayerInfo(identity.ConfigSteamId, identity.ConfigName, identity.TeamSlot);
+            return new AutoTournamentCS2PlayerInfo(identity.ConfigSteamId, identity.ConfigName, identity.TeamSlot);
         }
 
-        return new MatchZyPlayerInfo(player.SteamID.ToString(), player.PlayerName, teamLabelFallback);
+        return new AutoTournamentCS2PlayerInfo(player.SteamID.ToString(), player.PlayerName, teamLabelFallback);
     }
 
     /// <summary>
@@ -500,11 +500,11 @@ public partial class MatchZy
             string desiredSide = "T";
             if (identity.TeamSlot == "team1")
             {
-                desiredSide = teamSides.TryGetValue(matchzyTeam1, out var side) ? side : "CT";
+                desiredSide = teamSides.TryGetValue(atTeam1, out var side) ? side : "CT";
             }
             else if (identity.TeamSlot == "team2")
             {
-                desiredSide = teamSides.TryGetValue(matchzyTeam2, out var side) ? side : "TERRORIST";
+                desiredSide = teamSides.TryGetValue(atTeam2, out var side) ? side : "TERRORIST";
             }
 
             // Quota value we want to reach when this bot is spawned.
@@ -631,7 +631,7 @@ public partial class MatchZy
                 var playerInfo = BuildPlayerInfo(bot, "none");
                 Log($"[SimulationMode] Sending synthetic player_connect for sim bot UserId={userId}, steamid={playerInfo.SteamId}, name={playerInfo.Name}, team={playerInfo.Team}.");
 
-                var playerConnectEvent = new MatchZyPlayerConnectedEvent
+                var playerConnectEvent = new AutoTournamentCS2PlayerConnectedEvent
                 {
                     MatchId = liveMatchId,
                     Player = playerInfo

@@ -3,10 +3,10 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
 
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
 
         private void InitPlayerDamageInfo()

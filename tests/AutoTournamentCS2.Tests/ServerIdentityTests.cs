@@ -1,20 +1,20 @@
 using System.Text;
-using MatchZy;
+using AutoTournamentCS2;
 using Xunit;
 
-namespace MatchZy.Tests;
+namespace AutoTournamentCS2.Tests;
 
 public class ServerIdentityTests
 {
     // Exact /proc/<pid>/cmdline bytes (base64) of the three cs2 game processes on the production
     // box that hit the collision in 1.4.26, started by csm 1.7.8 through cs2.sh. Captured with
-    // `base64 -w0 /proc/<pid>/cmdline`.
+    // `base64 -w0 /proc/<pid>/cmdline`, with the scope argument changed to its 2.0.0 name.
     private const string ProcCmdlineServer1 =
-        "L2hvbWUvY3Myc2VydmVybWFuYWdlci9zZXJ2ZXItMS9nYW1lL2Jpbi9saW51eHN0ZWFtcnQ2NC9jczIALWRlZGljYXRlZAAtaXAAMC4wLjAuMAArbWFwAGRlX2R1c3QyAC1wb3J0ADI3MDE1ACt0dl9wb3J0ADI3MDIwACttYXhwbGF5ZXJzADE1AC11c2VyY29uACttYXRjaHp5X2NvbmZpZ19zY29wZQBjczItc2VydmVyLTEA";
+        "L2hvbWUvY3Myc2VydmVybWFuYWdlci9zZXJ2ZXItMS9nYW1lL2Jpbi9saW51eHN0ZWFtcnQ2NC9jczIALWRlZGljYXRlZAAtaXAAMC4wLjAuMAArbWFwAGRlX2R1c3QyAC1wb3J0ADI3MDE1ACt0dl9wb3J0ADI3MDIwACttYXhwbGF5ZXJzADE1AC11c2VyY29uACthdF9jb25maWdfc2NvcGUAY3MyLXNlcnZlci0xAA==";
     private const string ProcCmdlineServer2 =
-        "L2hvbWUvY3Myc2VydmVybWFuYWdlci9zZXJ2ZXItMi9nYW1lL2Jpbi9saW51eHN0ZWFtcnQ2NC9jczIALWRlZGljYXRlZAAtaXAAMC4wLjAuMAArbWFwAGRlX2R1c3QyAC1wb3J0ADI3MDI1ACt0dl9wb3J0ADI3MDMwACttYXhwbGF5ZXJzADE1AC11c2VyY29uACttYXRjaHp5X2NvbmZpZ19zY29wZQBjczItc2VydmVyLTIA";
+        "L2hvbWUvY3Myc2VydmVybWFuYWdlci9zZXJ2ZXItMi9nYW1lL2Jpbi9saW51eHN0ZWFtcnQ2NC9jczIALWRlZGljYXRlZAAtaXAAMC4wLjAuMAArbWFwAGRlX2R1c3QyAC1wb3J0ADI3MDI1ACt0dl9wb3J0ADI3MDMwACttYXhwbGF5ZXJzADE1AC11c2VyY29uACthdF9jb25maWdfc2NvcGUAY3MyLXNlcnZlci0yAA==";
     private const string ProcCmdlineServer3 =
-        "L2hvbWUvY3Myc2VydmVybWFuYWdlci9zZXJ2ZXItMy9nYW1lL2Jpbi9saW51eHN0ZWFtcnQ2NC9jczIALWRlZGljYXRlZAAtaXAAMC4wLjAuMAArbWFwAGRlX2R1c3QyAC1wb3J0ADI3MDM1ACt0dl9wb3J0ADI3MDQwACttYXhwbGF5ZXJzADE1AC11c2VyY29uACttYXRjaHp5X2NvbmZpZ19zY29wZQBjczItc2VydmVyLTMA";
+        "L2hvbWUvY3Myc2VydmVybWFuYWdlci9zZXJ2ZXItMy9nYW1lL2Jpbi9saW51eHN0ZWFtcnQ2NC9jczIALWRlZGljYXRlZAAtaXAAMC4wLjAuMAArbWFwAGRlX2R1c3QyAC1wb3J0ADI3MDM1ACt0dl9wb3J0ADI3MDQwACttYXhwbGF5ZXJzADE1AC11c2VyY29uACthdF9jb25maWdfc2NvcGUAY3MyLXNlcnZlci0zAA==";
 
     private static string[] Argv(string base64) => ServerIdentity.ParseProcCmdline(Convert.FromBase64String(base64));
 
@@ -60,7 +60,7 @@ public class ServerIdentityTests
             "/home/cs2servermanager/server-2/game/bin/linuxsteamrt64/cs2",
             "-dedicated", "-ip", "0.0.0.0", "+map", "de_dust2",
             "-port", "27025", "+tv_port", "27030", "+maxplayers", "15", "-usercon",
-            "+matchzy_config_scope", "cs2-server-2",
+            "+at_config_scope", "cs2-server-2",
         }, argv);
     }
 
@@ -117,17 +117,17 @@ public class ServerIdentityTests
     // ---- flag forms ----------------------------------------------------------------------------
 
     [Theory]
-    [InlineData("+matchzy_config_scope", "eu-3")]
-    [InlineData("-matchzy_config_scope", "eu-3")]
-    [InlineData("+MATCHZY_CONFIG_SCOPE", "eu-3")]
+    [InlineData("+at_config_scope", "eu-3")]
+    [InlineData("-at_config_scope", "eu-3")]
+    [InlineData("+AT_CONFIG_SCOPE", "eu-3")]
     public void ScopeIsReadFromNameValueForm(string flag, string value)
     {
         Assert.Equal("eu-3", ServerIdentity.ParseScopeOverride(new[] { "cs2", flag, value }));
     }
 
     [Theory]
-    [InlineData("+matchzy_config_scope=eu-3")]
-    [InlineData("-matchzy_config_scope=eu-3")]
+    [InlineData("+at_config_scope=eu-3")]
+    [InlineData("-at_config_scope=eu-3")]
     public void ScopeIsReadFromNameEqualsValueForm(string arg)
     {
         Assert.Equal("eu-3", ServerIdentity.ParseScopeOverride(new[] { "cs2", "-dedicated", arg }));
@@ -160,15 +160,15 @@ public class ServerIdentityTests
         Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "-dedicated", "-port", "27015" }));
         // A trailing flag with no value after it must not throw.
         Assert.Null(ServerIdentity.ParseGamePort(new[] { "cs2", "-port" }));
-        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+matchzy_config_scope" }));
-        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+matchzy_config_scope=" }));
-        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+matchzy_config_scope", "" }));
+        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+at_config_scope" }));
+        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+at_config_scope=" }));
+        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+at_config_scope", "" }));
     }
 
     [Fact]
     public void AFlagIsNeverTakenAsAValue()
     {
-        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+matchzy_config_scope", "+map", "de_dust2" }));
+        Assert.Null(ServerIdentity.ParseScopeOverride(new[] { "cs2", "+at_config_scope", "+map", "de_dust2" }));
         Assert.Null(ServerIdentity.ParseGamePort(new[] { "cs2", "-port", "-usercon" }));
     }
 
@@ -194,7 +194,7 @@ public class ServerIdentityTests
     [Fact]
     public void TheStartArgumentWinsOverTheConvar()
     {
-        var r = Resolve(new[] { "cs2", "+matchzy_config_scope", "from-args" }, convarScope: "from-convar");
+        var r = Resolve(new[] { "cs2", "+at_config_scope", "from-args" }, convarScope: "from-convar");
         Assert.Equal("from-args", r.Scope);
         Assert.Equal(ScopeSource.StartArgument, r.Source);
     }
@@ -315,7 +315,7 @@ public class ServerIdentityTests
     public void NoResolutionEverProducesTheLegacyScope()
     {
         Assert.NotEqual(ServerIdentity.LegacyScope, Resolve(null, machine: null).Scope);
-        Assert.NotEqual(ServerIdentity.LegacyScope, Resolve(new[] { "cs2", "+matchzy_config_scope", "   " }, machine: null).Scope);
+        Assert.NotEqual(ServerIdentity.LegacyScope, Resolve(new[] { "cs2", "+at_config_scope", "   " }, machine: null).Scope);
         Assert.NotEqual(ServerIdentity.LegacyScope, ServerIdentity.Sanitize("   "));
     }
 
@@ -324,7 +324,7 @@ public class ServerIdentityTests
     {
         Assert.True(ServerIdentity.HasCommandLineIdentity(Argv(ProcCmdlineServer2)));
         Assert.True(ServerIdentity.HasCommandLineIdentity(new[] { "cs2", "-port", "27015" }));
-        Assert.True(ServerIdentity.HasCommandLineIdentity(new[] { "cs2", "+matchzy_config_scope=x" }));
+        Assert.True(ServerIdentity.HasCommandLineIdentity(new[] { "cs2", "+at_config_scope=x" }));
         Assert.False(ServerIdentity.HasCommandLineIdentity(new[] { "cs2", "-dedicated", "+tv_port", "27020" }));
         Assert.False(ServerIdentity.HasCommandLineIdentity(null));
     }

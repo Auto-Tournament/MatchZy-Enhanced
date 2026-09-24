@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 using Newtonsoft.Json.Linq;
 
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
 
     public class MatchConfig
@@ -14,7 +14,7 @@ namespace MatchZy
         [JsonPropertyName("maps_pool")]
         public List<string> MapsPool { get; set; } = new List<string>();
 
-        // DEPRECATED: kept for JSON compatibility with original MatchZy / Get5-style veto configs.
+        // DEPRECATED: kept for JSON compatibility with upstream / Get5-style veto configs.
         // The enhanced Auto Tournament fork ignores these when deciding maps; maps are driven entirely by the external platform.
         [JsonPropertyName("maps_left_in_veto_pool")]
         public List<string> MapsLeftInVetoPool { get; set; } = new List<string>();
@@ -79,7 +79,7 @@ namespace MatchZy
         [JsonPropertyName("wingman")]
         public bool Wingman { get; set; } = false;
 
-        // When true, MatchZy runs the match in bot-driven simulation mode instead of waiting for real players.
+        // When true, Auto Tournament CS2 runs the match in bot-driven simulation mode instead of waiting for real players.
         // This flag is optional and defaults to false to preserve existing behavior.
         [JsonPropertyName("simulation")]
         public bool Simulation { get; set; } = false;
@@ -104,7 +104,7 @@ namespace MatchZy
 
         // Optional: per-match admin SteamIDs (Steam64). When provided, any player whose
         // SteamID appears in this list is treated as an admin for the duration of this match,
-        // in addition to any global admins defined via CSSharp or MatchZy admins.json.
+        // in addition to any global admins defined via CSSharp or Auto Tournament CS2 admins.json.
         [JsonPropertyName("admins")]
         public List<string> AdminSteamIds { get; set; } = new List<string>();
 

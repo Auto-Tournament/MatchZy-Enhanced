@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>Runs a callback once after a delay. Disposing the handle cancels it.</summary>
 public interface IBootstrapScheduler
@@ -10,8 +10,8 @@ public interface IBootstrapScheduler
 }
 
 /// <summary>
-/// Decides when the plugin fetches its bootstrap payload after <c>matchzy_bootstrap_url</c> or
-/// <c>matchzy_bootstrap_token</c> changes.
+/// Decides when the plugin fetches its bootstrap payload after <c>at_bootstrap_url</c> or
+/// <c>at_bootstrap_token</c> changes.
 ///
 /// A controller sets both values with separate commands. Fetching as soon as either one is set
 /// uses whatever the other one currently is, which is stale whenever both change: a fetch on
@@ -86,7 +86,7 @@ public sealed class BootstrapFetchDebouncer
     public bool FetchScheduled => pendingTimer != null;
 
     /// <summary>
-    /// Call after <c>matchzy_bootstrap_url</c> or <c>matchzy_bootstrap_token</c> was set, with the
+    /// Call after <c>at_bootstrap_url</c> or <c>at_bootstrap_token</c> was set, with the
     /// value before and after. Returns true when the debounce timer was (re)started.
     /// </summary>
     public bool OnValueSet(string? previous, string? next)
@@ -214,14 +214,14 @@ public static class BootstrapPayloadCheck
     }
 
     /// <summary>
-    /// The value of the last <c>matchzy_server_id</c> command in <paramref name="commands"/>, with
+    /// The value of the last <c>at_server_id</c> command in <paramref name="commands"/>, with
     /// surrounding quotes removed, or null when there is none.
     /// </summary>
     public static string? ServerIdFromCommands(IEnumerable<string>? commands)
     {
         if (commands == null) return null;
 
-        const string name = "matchzy_server_id";
+        const string name = "at_server_id";
         string? found = null;
         foreach (string? raw in commands)
         {
@@ -251,13 +251,13 @@ public static class BootstrapPayloadCheck
         string? urlId = ServerIdFromUrl(url);
         if (urlId != null && !string.Equals(urlId, payloadId, StringComparison.Ordinal))
         {
-            warnings.Add($"[Bootstrap] WARNING: payload sets matchzy_server_id \"{payloadId}\" but was fetched from the bootstrap URL of server \"{urlId}\" ({url})");
+            warnings.Add($"[Bootstrap] WARNING: payload sets at_server_id \"{payloadId}\" but was fetched from the bootstrap URL of server \"{urlId}\" ({url})");
         }
 
         string current = currentServerId?.Trim() ?? "";
         if (current.Length > 0 && !string.Equals(current, payloadId, StringComparison.Ordinal))
         {
-            warnings.Add($"[Bootstrap] WARNING: payload changes matchzy_server_id from \"{current}\" to \"{payloadId}\" (fetched from {url}); if that is wrong, matchzy_bootstrap_url is stale");
+            warnings.Add($"[Bootstrap] WARNING: payload changes at_server_id from \"{current}\" to \"{payloadId}\" (fetched from {url}); if that is wrong, at_bootstrap_url is stale");
         }
 
         return warnings;
