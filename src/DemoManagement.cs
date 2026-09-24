@@ -89,7 +89,18 @@ namespace MatchZy
                 Log($"[StartDemoRecording] Failed to force tv_enable: {ex.Message}");
             }
             
-            string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
+            // Only letters, digits, '-', '_' and '.' (issue #35): see DemoFileName.
+            (int team1Score, int team2Score) = GetTeamsScore();
+            string demoFileName = DemoFileName.Build(
+                demoNameFormat,
+                DateTime.Now,
+                liveMatchId,
+                Server.MapName,
+                matchConfig.CurrentMapNumber,
+                matchzyTeam1.teamName,
+                matchzyTeam2.teamName,
+                team1Score,
+                team2Score) + ".dem";
             try
             {
                 // Make sure the target directory exists before tv_record (fresh servers have no MatchZy/ yet).
@@ -169,7 +180,8 @@ namespace MatchZy
             Log($"[StopDemoRecording] Going to stop demorecording in {delay}s");
             string demoPath = Path.Join(Server.GameDirectory + "/csgo/", activeDemoFile);
             // Captured now: by the time the upload runs the next map may already be loaded.
-            string mapName = Server.MapName;
+            // The same map token the demo name was built with, so the fallback search matches it.
+            string mapName = DemoFileName.MapToken(Server.MapName);
             DateTime? recordingStartedUtc = demoRecordingStartedUtc;
             (int t1score, int t2score) = GetTeamsScore();
             int roundNumber = t1score + t2score;
