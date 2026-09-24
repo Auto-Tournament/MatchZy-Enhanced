@@ -17,7 +17,7 @@ if [ -f ".env" ]; then
     set +a
 fi
 
-echo -e "${BLUE}🚀 MatchZy Automated Release Script${NC}\n"
+echo -e "${BLUE}🚀 Auto Tournament CS2 (1.x) Automated Release Script${NC}\n"
 
 ensure_cmd() {
     local cmd="$1"
@@ -301,6 +301,17 @@ else
     echo -e "${GREEN}📦 Using current version: ${VERSION}${NC}"
 fi
 
+# This is the 1.x hotfix line (hotfix/1.4.x). 2.x is released from dev; guard against
+# releasing a 1.x build as 2.x, or releasing from a detached HEAD (nothing to push).
+if [ "${VERSION%%.*}" != "1" ]; then
+    echo -e "${RED}❌ This branch only releases 1.x versions (got ${VERSION}). 2.x is released from dev.${NC}"
+    exit 1
+fi
+if [ -z "$(git branch --show-current 2>/dev/null)" ]; then
+    echo -e "${RED}❌ Not on a branch (detached HEAD). Run the release on the hotfix/1.4.x branch.${NC}"
+    exit 1
+fi
+
 # Ensure working tree is completely clean before proceeding
 if ! git diff --quiet || ! git diff --cached --quiet; then
     echo -e "${RED}❌ Working tree is not clean. Please commit or stash all changes before running the release script.${NC}"
@@ -329,8 +340,8 @@ preflight_deps
 preflight_auth
 preflight_release_config
 
-# Check if tag already exists (local)
-if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+# Check if tag already exists (local or on origin)
+if git rev-parse "v${VERSION}" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
     echo -e "${RED}❌ Tag v${VERSION} already exists!${NC}"
     echo "Please bump to a new version or delete the existing tag:"
     echo "  git tag -d v${VERSION}"
@@ -376,6 +387,10 @@ cp -r build/Release/net8.0/publish/* "${BUILD_ROOT}/${RELEASE_DIR}/addons/counte
 # Copy config files
 echo -e "${BLUE}📂 Copying config files...${NC}"
 cp -r cfg/MatchZy/* "${BUILD_ROOT}/${RELEASE_DIR}/cfg/MatchZy/"
+# database.json holds the operator's database connection (SQLite or MySQL). Shipping the SQLite
+# default overwrote an operator's MySQL settings on every update, and their match history
+# seemed to vanish. The plugin writes the default itself when the file is missing.
+rm -f "${BUILD_ROOT}/${RELEASE_DIR}/cfg/MatchZy/database.json"
 
 # Create zip file
 echo -e "\n${BLUE}🗜️  Creating release archive...${NC}"
@@ -383,6 +398,21 @@ mkdir -p "${BUILD_ROOT}"
 (
   cd "${BUILD_ROOT}" && zip -r -q "${RELEASE_DIR}.zip" "${RELEASE_DIR}"
 )
+
+# Check the zip before anything is committed or published.
+ZIP_LISTING="$(unzip -Z1 "${BUILD_ROOT}/${RELEASE_DIR}.zip")"
+for required in \
+    "${RELEASE_DIR}/addons/counterstrikesharp/plugins/MatchZy/MatchZy.dll" \
+    "${RELEASE_DIR}/cfg/MatchZy/config.cfg"; do
+    if ! grep -qx "$required" <<< "$ZIP_LISTING"; then
+        echo -e "${RED}❌ ${RELEASE_DIR}.zip is missing ${required}${NC}"
+        exit 1
+    fi
+done
+if grep -q "/database.json$" <<< "$ZIP_LISTING"; then
+    echo -e "${RED}❌ ${RELEASE_DIR}.zip must not contain database.json${NC}"
+    exit 1
+fi
 
 # Get file size for display
 SIZE=$(du -h "${BUILD_ROOT}/${RELEASE_DIR}.zip" | cut -f1)
@@ -402,8 +432,9 @@ git commit -m "Release v${VERSION}"
 
 echo -e "\n${BLUE}📝 Generating changelog for GitHub release...${NC}"
 
-# Changelog based on commits between the previous tag (if any) and HEAD
-prev_tag=$(git tag --sort=-v:refname | head -n 1 || echo "")
+# Changelog based on commits between the previous release on this branch (if any) and HEAD.
+# Only tags reachable from HEAD count: the newest tag in the repo is v2.x, which is not on this branch.
+prev_tag=$(git tag --merged HEAD --sort=-v:refname | head -n 1 || echo "")
 
 log_range=""
 if [ -n "$prev_tag" ]; then
@@ -440,7 +471,7 @@ ${CHANGELOG}
 Config files are located in \`csgo/cfg/MatchZy/\`:
 - \`config.cfg\` - Main plugin configuration
 - \`admins.json\` - Admin permissions
-- \`database.json\` - Database settings
+- \`database.json\` - Database settings (created on first start, never overwritten by an update)
 - \`live.cfg\`, \`warmup.cfg\`, \`knife.cfg\` - Match configs
 EOF
 )
@@ -450,12 +481,16 @@ EOF
 echo -e "\n${BLUE}⬆️  Pushing release commit to origin...${NC}"
 CURRENT_BRANCH=$(git branch --show-current)
 git push origin "$CURRENT_BRANCH"
+RELEASE_SHA=$(git rev-parse HEAD)
 
 # Create GitHub release (this will also create tag vX.Y.Z on GitHub if it doesn't exist)
 echo -e "\n${BLUE}🌟 Creating GitHub release (and tag v${VERSION})...${NC}"
+# --target: without it GitHub creates the tag on the default branch (dev, 2.x), not on this commit.
+# --latest: 1.x is what the current platform talks to; v2.0.0 stays a pre-release.
 gh release create "v${VERSION}" \
     "${BUILD_ROOT}/${RELEASE_DIR}.zip" \
-    --title "MatchZy v${VERSION}" \
+    --target "${RELEASE_SHA}" \
+    --title "Auto Tournament CS2 v${VERSION}" \
     --notes "$RELEASE_NOTES" \
     --draft=false \
     --latest

@@ -32,7 +32,60 @@ public class DemoFileLocatorTests
     public void CandidateDirectoriesAreDistinctAndMostSpecificFirst()
     {
         var dirs = DemoFileLocator.CandidateDirectories(Csgo, $"{Csgo}/MatchZy/x.dem", "MatchZy/");
-        Assert.Equal(new[] { $"{Csgo}/MatchZy", Csgo }, dirs);
+        Assert.Equal(new[] { $"{Csgo}/MatchZy", $"{Csgo}/addons/metamod/MatchZy", Csgo, $"{Csgo}/addons/metamod" }, dirs);
+    }
+
+    // Issue #35: builds before 1.4.35 passed tv_record a relative path, and Metamod's search
+    // path put the demo in csgo/addons/metamod/<demo path>.
+    [Fact]
+    public void CandidateDirectoriesIncludeMetamodFolders()
+    {
+        var dirs = DemoFileLocator.CandidateDirectories(Csgo, $"{Csgo}/demos/x.dem", "demos");
+        Assert.Contains($"{Csgo}/addons/metamod/demos", dirs);
+        Assert.Contains($"{Csgo}/addons/metamod", dirs);
+        Assert.True(dirs.ToList().IndexOf($"{Csgo}/demos") < dirs.ToList().IndexOf($"{Csgo}/addons/metamod/demos"));
+    }
+
+    [Fact]
+    public void CandidateDirectoriesWithEmptyDemoPathHaveNoDuplicates()
+    {
+        var dirs = DemoFileLocator.CandidateDirectories(Csgo, $"{Csgo}/x.dem", "");
+        Assert.Equal(new[] { Csgo, $"{Csgo}/addons/metamod" }, dirs);
+    }
+
+    [Fact]
+    public void DemoRecordedUnderMetamodIsFound()
+    {
+        var dirs = DemoFileLocator.CandidateDirectories(Csgo, $"{Csgo}/MatchZy/2026-09-24_20-57-56_9_0.dem", "MatchZy/");
+        string recorded = $"{Csgo}/addons/metamod/MatchZy/2026-09-24_20-57-56_9_0.dem";
+        var logs = new List<string>();
+        string? found = DemoFileLocator.Resolve(
+            $"{Csgo}/MatchZy/2026-09-24_20-57-56_9_0.dem", dirs, 9, null, null,
+            path => path == recorded,
+            dir => dir == $"{Csgo}/addons/metamod/MatchZy"
+                ? new[] { new DemoFileCandidate(recorded, Start) }
+                : Array.Empty<DemoFileCandidate>(),
+            logs.Add);
+        Assert.Equal(recorded, found);
+    }
+
+    [Theory]
+    [InlineData("/home/container/game", "MatchZy/", "a.dem", "/home/container/game/csgo/MatchZy/a.dem")]
+    [InlineData("/home/container/game/", "MatchZy", "a.dem", "/home/container/game/csgo/MatchZy/a.dem")]
+    [InlineData("/srv/game", "", "a.dem", "/srv/game/csgo/a.dem")]
+    [InlineData("/srv/game", "/demos/sub/", "a.dem", "/srv/game/csgo/demos/sub/a.dem")]
+    [InlineData("C:\\cs2\\game", "MatchZy\\", "a.dem", "C:/cs2/game/csgo/MatchZy/a.dem")]
+    public void TvRecordPathIsAbsoluteWithForwardSlashes(string game, string demoPath, string file, string expected)
+    {
+        Assert.Equal(expected, DemoFileLocator.TvRecordPath(game, demoPath, file));
+    }
+
+    [Theory]
+    [InlineData("/home/container/game/csgo/MatchZy/a.dem", "/home/container/game/csgo/MatchZy/a.dem")]
+    [InlineData("C:/Program Files (x86)/Steam/game/csgo/MatchZy/a.dem", "\"C:/Program Files (x86)/Steam/game/csgo/MatchZy/a.dem\"")]
+    public void TvRecordArgumentQuotesOnlyPathsWithSpaces(string path, string expected)
+    {
+        Assert.Equal(expected, DemoFileLocator.TvRecordArgument(path));
     }
 
     [Fact]
