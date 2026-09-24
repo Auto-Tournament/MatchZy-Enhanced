@@ -15,7 +15,7 @@ namespace AutoTournamentCS2
 
         public override string ModuleName => "Auto Tournament CS2";
 
-        public override string ModuleVersion => "2.0.0";
+        public override string ModuleVersion => "1.4.34";
 
         public override string ModuleAuthor => "sivert (https://github.com/sivert-io/)";
 
