@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>One configured roster slot a simulation bot stands in for.</summary>
 public sealed record SimRosterSlot(string SteamId, string TeamSlot);

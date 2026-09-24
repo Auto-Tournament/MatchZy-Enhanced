@@ -8,11 +8,11 @@ using System.IO.Compression;
 using System.Net.Http.Json;
 using System.Text;
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
-        public string demoPath = "MatchZy/";
+        public string demoPath = "AutoTournamentCS2/";
         public string demoNameFormat = "{TIME}_{MATCH_ID}_{MAP}_{TEAM1}_vs_{TEAM2}";
         public string demoUploadURL = "";
         public string demoUploadHeaderKey = "";
@@ -54,8 +54,8 @@ namespace MatchZy
         {
             if (!isDemoRecordingEnabled)
             {
-                Log("[StartDemoRecording] Demo recording is disabled. Set matchzy_demo_recording_enabled to true to enable.");
-                Log("[DEMO_RECORDING] DISABLED (matchzy_demo_recording_enabled=0)");
+                Log("[StartDemoRecording] Demo recording is disabled. Set at_demo_recording_enabled to true to enable.");
+                Log("[DEMO_RECORDING] DISABLED (at_demo_recording_enabled=0)");
                 return;
             }
             if (isDemoRecording)
@@ -92,7 +92,7 @@ namespace MatchZy
             string demoFileName = FormatCvarValue(demoNameFormat.Replace(" ", "_")) + ".dem";
             try
             {
-                // Make sure the target directory exists before tv_record (fresh servers have no MatchZy/ yet).
+                // Make sure the target directory exists before tv_record (fresh servers have no AutoTournamentCS2/ yet).
                 string directoryPath = Path.Join(Server.GameDirectory + "/csgo/", DemoFileLocator.NormalizeDemoPath(demoPath));
                 if (!Directory.Exists(directoryPath))
                 {
@@ -128,7 +128,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        await SendEventAsync(new MatchZyDemoRecordingStartedEvent
+                        await SendEventAsync(new AutoTournamentCS2DemoRecordingStartedEvent
                         {
                             MatchId = liveMatchId,
                             MapNumber = matchConfig.CurrentMapNumber,
@@ -151,7 +151,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        await SendEventAsync(new MatchZyDemoRecordingStartedEvent
+                        await SendEventAsync(new AutoTournamentCS2DemoRecordingStartedEvent
                         {
                             MatchId = liveMatchId,
                             MapNumber = matchConfig.CurrentMapNumber,
@@ -193,7 +193,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        await SendEventAsync(new MatchZyDemoRecordingStoppedEvent
+                        await SendEventAsync(new AutoTournamentCS2DemoRecordingStoppedEvent
                         {
                             MatchId = liveMatchId,
                             MapNumber = currentMapNumber,
@@ -272,7 +272,7 @@ namespace MatchZy
         }
 
         [ConsoleCommand("get5_demo_upload_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for demos")]
-        [ConsoleCommand("matchzy_demo_upload_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for demos")]
+        [ConsoleCommand("at_demo_upload_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for demos")]
         public void DemoUploadHeaderKeyCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -282,7 +282,7 @@ namespace MatchZy
         }
 
         [ConsoleCommand("get5_demo_upload_header_value", "If defined, the value of the custom header added to the demos sent over HTTP")]
-        [ConsoleCommand("matchzy_demo_upload_header_value", "If defined, the value of the custom header added to the demos sent over HTTP")]
+        [ConsoleCommand("at_demo_upload_header_value", "If defined, the value of the custom header added to the demos sent over HTTP")]
         public void DemoUploadHeaderValueCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;

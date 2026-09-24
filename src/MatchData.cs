@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 public class Winner
 {
     [JsonPropertyName("side")]
@@ -131,7 +131,7 @@ public class PlayerStats
     public int Mvps { get; set; }
 }
 
-public class MatchZyPlayerInfo
+public class AutoTournamentCS2PlayerInfo
 {
     [JsonPropertyName("steamid")]
     public string SteamId { get; set; }
@@ -142,7 +142,7 @@ public class MatchZyPlayerInfo
     [JsonPropertyName("team")]
     public string Team { get; set; }
 
-    public MatchZyPlayerInfo(string steamId, string name, string team)
+    public AutoTournamentCS2PlayerInfo(string steamId, string name, string team)
     {
         SteamId = steamId;
         Name = name;
@@ -150,7 +150,7 @@ public class MatchZyPlayerInfo
     }
 }
 
-public class MatchZyTeamWrapper
+public class AutoTournamentCS2TeamWrapper
 {
     [JsonPropertyName("id")]
     public string Id { get; set; }
@@ -158,14 +158,14 @@ public class MatchZyTeamWrapper
     [JsonPropertyName("name")]
     public string Name { get; set; }
 
-    public MatchZyTeamWrapper(string id, string name)
+    public AutoTournamentCS2TeamWrapper(string id, string name)
     {
         Id = id;
         Name = name;
     }
 }
 
-public class MatchZyStatsTeam : MatchZyTeamWrapper
+public class AutoTournamentCS2StatsTeam : AutoTournamentCS2TeamWrapper
 {
     [JsonPropertyName("series_score")]
     public int SeriesScore { get; set; }
@@ -182,7 +182,7 @@ public class MatchZyStatsTeam : MatchZyTeamWrapper
     [JsonPropertyName("players")]
     public List<StatsPlayer> Players { get; set; }
 
-    public MatchZyStatsTeam(string id, string name, int seriesScore, int score, int scoreCt, int scoreT, List<StatsPlayer> players) : base(id, name)
+    public AutoTournamentCS2StatsTeam(string id, string name, int seriesScore, int score, int scoreCt, int scoreT, List<StatsPlayer> players) : base(id, name)
     {
         SeriesScore = seriesScore;
         Score = score;

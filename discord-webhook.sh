@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# MatchZy - Discord Webhook Script
-# Sends a Discord webhook notification for a MatchZy release
+# Auto Tournament CS2 - Discord Webhook Script
+# Sends a Discord webhook notification for an Auto Tournament CS2 release
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,25 +25,25 @@ fi
 cd "${PROJECT_ROOT}"
 
 # Configuration
-REPO_OWNER="sivert-io"
-REPO_NAME="MatchZy"
+REPO_OWNER="Auto-Tournament"
+REPO_NAME="cs2-plugin"
 
-echo -e "${GREEN}MatchZy - Discord Webhook${NC}"
+echo -e "${GREEN}Auto Tournament CS2 - Discord Webhook${NC}"
 echo "========================================="
 echo ""
 
-# Get version from argument or MatchZy.cs
+# Get version from argument or AutoTournamentCS2.cs
 if [ -n "$1" ]; then
     NEW_VERSION="$1"
     # Remove 'v' prefix if present
     NEW_VERSION="${NEW_VERSION#v}"
 else
-    # Get current version from src/MatchZy.cs
-    if [ -f "${PROJECT_ROOT}/src/MatchZy.cs" ]; then
-        NEW_VERSION=$(grep 'ModuleVersion =>' "${PROJECT_ROOT}/src/MatchZy.cs" | sed -E 's/.*\"(.*)\".*/\1/')
-        echo -e "${BLUE}Using version from MatchZy.cs: ${GREEN}${NEW_VERSION}${NC}"
+    # Get current version from src/AutoTournamentCS2.cs
+    if [ -f "${PROJECT_ROOT}/src/AutoTournamentCS2.cs" ]; then
+        NEW_VERSION=$(grep 'ModuleVersion =>' "${PROJECT_ROOT}/src/AutoTournamentCS2.cs" | sed -E 's/.*\"(.*)\".*/\1/')
+        echo -e "${BLUE}Using version from AutoTournamentCS2.cs: ${GREEN}${NEW_VERSION}${NC}"
     else
-        echo -e "${RED}Error: src/MatchZy.cs not found and no version provided${NC}"
+        echo -e "${RED}Error: src/AutoTournamentCS2.cs not found and no version provided${NC}"
         echo ""
         echo "Usage:"
         echo "  ./discord-webhook.sh [VERSION]"
@@ -225,9 +225,9 @@ if command -v jq &> /dev/null; then
     echo "$CHANGELOG" > /tmp/changelog.txt
     
     jq -n \
-        --arg content "🚀 **New MatchZy Release: v${NEW_VERSION}**" \
-        --arg title "MatchZy v${NEW_VERSION}" \
-        --arg description "A new version of the MatchZy CS2 plugin has been released." \
+        --arg content "🚀 **New Auto Tournament CS2 Release: v${NEW_VERSION}**" \
+        --arg title "Auto Tournament CS2 v${NEW_VERSION}" \
+        --arg description "A new version of the Auto Tournament CS2 plugin has been released." \
         --arg changelog "$(cat /tmp/changelog.txt)" \
         --arg github "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}" \
         --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -250,7 +250,7 @@ if command -v jq &> /dev/null; then
               }
             ],
             footer: {
-              text: "MatchZy"
+              text: "Auto Tournament CS2"
             },
             timestamp: $timestamp
           }]
@@ -263,10 +263,10 @@ else
     
     cat > "$TEMP_JSON" <<EOF
 {
-  "content": "🚀 **New MatchZy Release: v${NEW_VERSION}**",
+  "content": "🚀 **New Auto Tournament CS2 Release: v${NEW_VERSION}**",
   "embeds": [{
-    "title": "MatchZy v${NEW_VERSION}",
-    "description": "A new version of the MatchZy CS2 plugin has been released.",
+    "title": "Auto Tournament CS2 v${NEW_VERSION}",
+    "description": "A new version of the Auto Tournament CS2 plugin has been released.",
     "color": 3066993,
     "fields": [
       {
@@ -281,7 +281,7 @@ else
       }
     ],
     "footer": {
-      "text": "MatchZy"
+      "text": "Auto Tournament CS2"
     },
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   }]

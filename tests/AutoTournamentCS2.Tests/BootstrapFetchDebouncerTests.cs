@@ -1,7 +1,7 @@
-using MatchZy;
+using AutoTournamentCS2;
 using Xunit;
 
-namespace MatchZy.Tests;
+namespace AutoTournamentCS2.Tests;
 
 public class BootstrapFetchDebouncerTests
 {
@@ -260,7 +260,7 @@ public class BootstrapFetchDebouncerTests
         // server-1 after upgrading to 1.4.27: persisted URL still pointed at s_3.
         var h = new Harness { Url = OldUrl, Token = NewToken };
 
-        // MAT: matchzy_server_id "s_1", matchzy_bootstrap_token, matchzy_bootstrap_url (RCON round trips apart).
+        // MAT: at_server_id "s_1", at_bootstrap_token, at_bootstrap_url (RCON round trips apart).
         h.SetToken(NewToken);
         h.Advance(0.05);
         h.SetUrl(NewUrl);
@@ -290,13 +290,13 @@ public class BootstrapPayloadCheckTests
     {
         Assert.Equal("s_3", BootstrapPayloadCheck.ServerIdFromCommands(new[]
         {
-            "matchzy_clear_event_queue",
-            "matchzy_server_id \"s_2\"",
-            "matchzy_server_idx \"nope\"",
-            "  matchzy_server_id   s_3 ",
-            "matchzy_remote_log_url \"http://mat/api/events?server_id=s_9\"",
+            "at_clear_event_queue",
+            "at_server_id \"s_2\"",
+            "at_server_idx \"nope\"",
+            "  at_server_id   s_3 ",
+            "at_remote_log_url \"http://mat/api/events?server_id=s_9\"",
         }));
-        Assert.Null(BootstrapPayloadCheck.ServerIdFromCommands(new[] { "matchzy_server_id", "matchzy_server_id \"\"" }));
+        Assert.Null(BootstrapPayloadCheck.ServerIdFromCommands(new[] { "at_server_id", "at_server_id \"\"" }));
         Assert.Null(BootstrapPayloadCheck.ServerIdFromCommands(null));
     }
 
@@ -304,7 +304,7 @@ public class BootstrapPayloadCheckTests
     public void WarnsWhenPayloadIdDiffersFromUrl()
     {
         var warnings = BootstrapPayloadCheck.ServerIdWarnings(
-            "http://mat/api/servers/s_1/bootstrap", new[] { "matchzy_server_id \"s_3\"" }, currentServerId: "s_3");
+            "http://mat/api/servers/s_1/bootstrap", new[] { "at_server_id \"s_3\"" }, currentServerId: "s_3");
 
         Assert.Single(warnings);
         Assert.Contains("fetched from the bootstrap URL of server \"s_1\"", warnings[0]);
@@ -315,7 +315,7 @@ public class BootstrapPayloadCheckTests
     {
         // The production case: MAT set s_1, the stale URL returned s_3's payload.
         var warnings = BootstrapPayloadCheck.ServerIdWarnings(
-            "http://mat/api/servers/s_3/bootstrap", new[] { "matchzy_server_id \"s_3\"" }, currentServerId: "s_1");
+            "http://mat/api/servers/s_3/bootstrap", new[] { "at_server_id \"s_3\"" }, currentServerId: "s_1");
 
         Assert.Single(warnings);
         Assert.Contains("from \"s_1\" to \"s_3\"", warnings[0]);
@@ -325,10 +325,10 @@ public class BootstrapPayloadCheckTests
     public void NoWarningWhenEverythingAgrees()
     {
         Assert.Empty(BootstrapPayloadCheck.ServerIdWarnings(
-            "http://mat/api/servers/s_1/bootstrap", new[] { "matchzy_server_id \"s_1\"" }, "s_1"));
+            "http://mat/api/servers/s_1/bootstrap", new[] { "at_server_id \"s_1\"" }, "s_1"));
         Assert.Empty(BootstrapPayloadCheck.ServerIdWarnings(
-            "http://mat/api/servers/s_1/bootstrap", new[] { "matchzy_server_id \"s_1\"" }, ""));
+            "http://mat/api/servers/s_1/bootstrap", new[] { "at_server_id \"s_1\"" }, ""));
         Assert.Empty(BootstrapPayloadCheck.ServerIdWarnings(
-            "http://mat/api/servers/s_1/bootstrap", new[] { "matchzy_chat_prefix x" }, "s_2"));
+            "http://mat/api/servers/s_1/bootstrap", new[] { "at_chat_prefix x" }, "s_2"));
     }
 }

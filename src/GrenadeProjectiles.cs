@@ -3,7 +3,7 @@ using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 using System.Runtime.InteropServices;
 
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 public static class GrenadeFunctions
 {

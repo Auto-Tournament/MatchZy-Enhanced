@@ -1,48 +1,26 @@
-# Contributing to MatchZy Auto Tournament
+# Contributing to Auto Tournament CS2
 
 Thank you for your interest in contributing! 🎉
-
-## 📚 Full Documentation
-
-For detailed contribution guidelines, please see:
-
-**[Documentation](https://docs.sivert.io/docs/me)**
 
 ## 🚀 Quick Start
 
 1. **Fork & Clone**
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/matchzy-auto-tournament.git
-   cd matchzy-auto-tournament
+   git clone https://github.com/YOUR_USERNAME/cs2-plugin.git
+   cd cs2-plugin
    ```
 
-2. **Install Dependencies**
+2. **Build and test** (needs the .NET 8 SDK)
 
    ```bash
-   yarn install
+   dotnet build -c Release
+   dotnet test tests/AutoTournamentCS2.Tests -c Release
    ```
 
-3. **Setup Environment**
-
-   ```bash
-   # Start PostgreSQL
-   yarn db
-
-   # Set environment variables
-   export API_TOKEN=admin123
-   export SERVER_TOKEN=server123
-   export DB_HOST=localhost
-   export DB_PORT=5432
-   export DB_USER=postgres
-   export DB_PASSWORD=postgres
-   export DB_NAME=matchzy_tournament
-   ```
-
-4. **Start Development**
-   ```bash
-   yarn dev
-   ```
+   The plugin is built to `build/Release/net8.0/AutoTournamentCS2.dll`. To try it on a server,
+   copy the build output to `addons/counterstrikesharp/plugins/AutoTournamentCS2/` and the files
+   in `cfg/AutoTournamentCS2/` to `csgo/cfg/AutoTournamentCS2/`.
 
 ## 📝 Guidelines
 
@@ -54,12 +32,12 @@ For detailed contribution guidelines, please see:
 
 ## 🐛 Reporting Issues
 
-Found a bug? Please [open an issue](https://github.com/sivert-io/MatchZy-Enhanced/issues/new) with:
+Found a bug? Please [open an issue](https://github.com/Auto-Tournament/cs2-plugin/issues/new) with:
 
 - Clear description
 - Steps to reproduce
 - Expected vs actual behavior
-- Environment details (OS, Docker version, etc.)
+- Environment details (plugin version, CounterStrikeSharp version, OS)
 
 ## 🙏 Community Requests
 
@@ -73,7 +51,7 @@ Need help testing something or getting feedback? Use the **Community Request** i
 
 ## 💬 Questions?
 
-- [GitHub Discussions](https://github.com/sivert-io/MatchZy-Enhanced/discussions) - Ask questions
+- [GitHub Discussions](https://github.com/Auto-Tournament/cs2-plugin/discussions) - Ask questions
 - [Documentation](https://docs.sivert.io/docs/me) - Read the docs
 
 ## 📖 Code of Conduct

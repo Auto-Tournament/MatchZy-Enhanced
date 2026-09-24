@@ -3,8 +3,8 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 
-namespace MatchZy;
-public partial class MatchZy
+namespace AutoTournamentCS2;
+public partial class AutoTournamentCS2
 {
     public HookResult EventPlayerConnectFullHandler(EventPlayerConnectFull @event, GameEventInfo info)
     {
@@ -32,7 +32,7 @@ public partial class MatchZy
             }
 
             // Handling whitelisted players (skip for simulation bots). Admins are allowed
-            // to bypass the MatchZy whitelist and may connect even if they are not on the
+            // to bypass the Auto Tournament CS2 whitelist and may connect even if they are not on the
             // per-server whitelist or in the match roster.
             bool isSimulationBot = isSimulationMode && player.IsBot;
             if (!isSimulationBot && (!player.IsBot || !player.IsHLTV))
@@ -124,7 +124,7 @@ public partial class MatchZy
 
                 Log($"[EventPlayerConnectFull] player_connect payload: steamid={playerInfo.SteamId}, name={playerInfo.Name}, team={playerInfo.Team}");
 
-                var playerConnectEvent = new MatchZyPlayerConnectedEvent
+                var playerConnectEvent = new AutoTournamentCS2PlayerConnectedEvent
                 {
                     MatchId = liveMatchId,
                     Player = playerInfo
@@ -214,15 +214,15 @@ public partial class MatchZy
 
             bool wasWarmupReady = readyAvailable && !matchStarted;
 
-            if (matchzyTeam1.coach.Contains(player))
+            if (atTeam1.coach.Contains(player))
             {
-                matchzyTeam1.coach.Remove(player);
+                atTeam1.coach.Remove(player);
                 SetPlayerVisible(player);
                 player.Clan = "";
             }
-            else if (matchzyTeam2.coach.Contains(player))
+            else if (atTeam2.coach.Contains(player))
             {
-                matchzyTeam2.coach.Remove(player);
+                atTeam2.coach.Remove(player);
                 SetPlayerVisible(player);
                 player.Clan = "";
             }
@@ -258,7 +258,7 @@ public partial class MatchZy
                     ReleaseSimulationSlot(userId, "disconnect");
                 }
 
-                var playerDisconnectEvent = new MatchZyPlayerDisconnectedEvent
+                var playerDisconnectEvent = new AutoTournamentCS2PlayerDisconnectedEvent
                 {
                     MatchId = liveMatchId,
                     Player = playerInfo
@@ -517,7 +517,7 @@ public partial class MatchZy
 
             if (@event.Attacker == @event.Userid)
             {
-                if (matchzyTeam1.coach.Contains(@event.Attacker!) || matchzyTeam2.coach.Contains(@event.Attacker!))
+                if (atTeam1.coach.Contains(@event.Attacker!) || atTeam2.coach.Contains(@event.Attacker!))
                 {
                     info.DontBroadcast = true;
                 }
@@ -538,7 +538,7 @@ public partial class MatchZy
         if (!IsPlayerValid(player)) return HookResult.Continue;
         if(lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime)) 
         {
-            PrintToPlayerChat(player!, Localizer["matchzy.pracc.smoke", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
+            PrintToPlayerChat(player!, Localizer["at.pracc.smoke", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
         return HookResult.Continue;
@@ -551,7 +551,7 @@ public partial class MatchZy
         if (!IsPlayerValid(player)) return HookResult.Continue;
         if(lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime)) 
         {
-            PrintToPlayerChat(player!, Localizer["matchzy.pracc.flash", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
+            PrintToPlayerChat(player!, Localizer["at.pracc.flash", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
         return HookResult.Continue;
@@ -564,7 +564,7 @@ public partial class MatchZy
         if (!IsPlayerValid(player)) return HookResult.Continue;
         if(lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime)) 
         {
-            PrintToPlayerChat(player!, Localizer["matchzy.pracc.grenade", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
+            PrintToPlayerChat(player!, Localizer["at.pracc.grenade", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
         return HookResult.Continue;
@@ -577,7 +577,7 @@ public partial class MatchZy
         if (!IsPlayerValid(player)) return HookResult.Continue;
         if(lastGrenadeThrownTime.TryGetValue(@event.Get<int>("entityid"), out var thrownTime)) 
         {
-            PrintToPlayerChat(player!, Localizer["matchzy.pracc.molotov", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
+            PrintToPlayerChat(player!, Localizer["at.pracc.molotov", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
         }
         return HookResult.Continue;
     }
@@ -589,7 +589,7 @@ public partial class MatchZy
         if (!IsPlayerValid(player)) return HookResult.Continue;
         if(lastGrenadeThrownTime.TryGetValue(@event.Entityid, out var thrownTime)) 
         {
-            PrintToPlayerChat(player!, Localizer["matchzy.pracc.decoy", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
+            PrintToPlayerChat(player!, Localizer["at.pracc.decoy", player!.PlayerName, $"{(DateTime.Now - thrownTime).TotalSeconds:0.00}"]);
             lastGrenadeThrownTime.Remove(@event.Entityid);
         }
         return HookResult.Continue;

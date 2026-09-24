@@ -1,4 +1,4 @@
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>What HandleMatchEnd should use for one map end.</summary>
 /// <param name="RestartDelay">Seconds until the map changes / series resets (feeds the post-series kick delay).</param>

@@ -3,8 +3,8 @@ bin/
 publish/
 build/
 /.vs
-MatchZy.sln
-MatchZy-*/
+AutoTournamentCS2.sln
+AutoTournamentCS2-*/
 *.zip
 
 # macOS

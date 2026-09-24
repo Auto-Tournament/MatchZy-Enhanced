@@ -8,10 +8,10 @@ using CounterStrikeSharp.API.Modules.Utils;
 using Newtonsoft.Json.Linq;
 
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
 
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
         public MatchConfig matchConfig = new();
 
@@ -31,11 +31,11 @@ namespace MatchZy
 
         public string loadedConfigFile = "";
 
-        public Team matchzyTeam1 = new()
+        public Team atTeam1 = new()
         {
             teamName = "COUNTER-TERRORISTS"
         };
-        public Team matchzyTeam2 = new()
+        public Team atTeam2 = new()
         {
             teamName = "TERRORISTS"
         };
@@ -55,7 +55,7 @@ namespace MatchZy
             HandleTeamNameChangeCommand(player, command.ArgString, 2);
         }
 
-        [ConsoleCommand("matchzy_loadmatch", "Loads a match from the given JSON file path (relative to the csgo/ directory)")]
+        [ConsoleCommand("at_loadmatch", "Loads a match from the given JSON file path (relative to the csgo/ directory)")]
         public void LoadMatch(CCSPlayerController? player, CommandInfo command)
         {
             try
@@ -64,7 +64,7 @@ namespace MatchZy
                 if (isMatchSetup)
                 {
                     // command.ReplyToCommand($"[LoadMatch] A match is already setup with id: {liveMatchId}, cannot load a new match!");
-                    ReplyToUserCommand(player, Localizer["matchzy.mm.matchisalreadysetup", liveMatchId]);
+                    ReplyToUserCommand(player, Localizer["at.mm.matchisalreadysetup", liveMatchId]);
                     Log($"[LoadMatch] A match is already setup with id: {liveMatchId}, cannot load a new match!");
                     return;
                 }
@@ -72,9 +72,9 @@ namespace MatchZy
                 string filePath = Path.Join(Server.GameDirectory + "/csgo", fileName);
                 if (!File.Exists(filePath))
                 {
-                    // command.ReplyToCommand($"[LoadMatch] Provided file does not exist! Usage: matchzy_loadmatch <filename>");
-                    ReplyToUserCommand(player, Localizer["matchzy.mm.filedoesntexist"]);
-                    Log($"[LoadMatch] Provided file does not exist! Usage: matchzy_loadmatch <filename>");
+                    // command.ReplyToCommand($"[LoadMatch] Provided file does not exist! Usage: at_loadmatch <filename>");
+                    ReplyToUserCommand(player, Localizer["at.mm.filedoesntexist"]);
+                    Log($"[LoadMatch] Provided file does not exist! Usage: at_loadmatch <filename>");
                     return;
                 }
                 string jsonData = File.ReadAllText(filePath);
@@ -82,7 +82,7 @@ namespace MatchZy
                 if (!success)
                 {
                     // command.ReplyToCommand("Match load failed! Resetting current match");
-                    ReplyToUserCommand(player, Localizer["matchzy.mm.matchloadfailed"]);
+                    ReplyToUserCommand(player, Localizer["at.mm.matchloadfailed"]);
                     UpdateTournamentStatus("error");
                     ResetMatch();
                 }
@@ -97,7 +97,7 @@ namespace MatchZy
         }
 
         [ConsoleCommand("get5_loadmatch_url", "Loads a match from the given URL")]
-        [ConsoleCommand("matchzy_loadmatch_url", "Loads a match from the given URL")]
+        [ConsoleCommand("at_loadmatch_url", "Loads a match from the given URL")]
         public void LoadMatchFromURL(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -119,7 +119,7 @@ namespace MatchZy
                 else
                 {
                     // command.ReplyToCommand($"[LoadMatchDataCommand] A match is already setup with id: {liveMatchId}, cannot load a new match!");
-                    ReplyToUserCommand(player, Localizer["matchzy.mm.get5matchisalreadysetup", liveMatchId]);
+                    ReplyToUserCommand(player, Localizer["at.mm.get5matchisalreadysetup", liveMatchId]);
                     Log($"[LoadMatchDataCommand] A match is already setup with id: {liveMatchId}, cannot load a new match! (status={currentStatus})");
                 }
                 return;
@@ -130,7 +130,7 @@ namespace MatchZy
             if (!IsValidUrl(url))
             {
                 // command.ReplyToCommand($"[LoadMatchDataCommand] Invalid URL: {url}. Please provide a valid URL to load the match!");
-                ReplyToUserCommand(player, Localizer["matchzy.mm.invalidurl", url]);
+                ReplyToUserCommand(player, Localizer["at.mm.invalidurl", url]);
                 Log($"[LoadMatchDataCommand] Invalid URL: {url}. Please provide a valid URL to load the match!");
                 return;
             }
@@ -152,7 +152,7 @@ namespace MatchZy
                     if (!success)
                     {
                         // command.ReplyToCommand("Match load failed! Resetting current match");
-                        ReplyToUserCommand(player, Localizer["matchzy.mm.matchloadfailed"]);
+                        ReplyToUserCommand(player, Localizer["at.mm.matchloadfailed"]);
                         UpdateTournamentStatus("error");
                         ResetMatch();
                     }
@@ -161,7 +161,7 @@ namespace MatchZy
                 else
                 {
                     // command.ReplyToCommand($"[LoadMatchFromURL] HTTP request failed with status code: {response.StatusCode}");
-                    ReplyToUserCommand(player, Localizer["matchzy.mm.httprequestfailed", response.StatusCode]);
+                    ReplyToUserCommand(player, Localizer["at.mm.httprequestfailed", response.StatusCode]);
                     UpdateTournamentStatus("error");
                     Log($"[LoadMatchFromURL] HTTP request failed with status code: {response.StatusCode}");
                 }
@@ -241,12 +241,12 @@ namespace MatchZy
             return identifier;
         }
 
-        [ConsoleCommand("matchzy_clear_queued_match", "Clears a match queued by matchzy_loadmatch_url during postgame so it is not loaded after reset")]
+        [ConsoleCommand("at_clear_queued_match", "Clears a match queued by at_loadmatch_url during postgame so it is not loaded after reset")]
         public void ClearQueuedMatchCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
 
-            string? cleared = ClearQueuedMatch("matchzy_clear_queued_match");
+            string? cleared = ClearQueuedMatch("at_clear_queued_match");
 
             // With no match on the server this is an idle server: make sure the status convars
             // say so, so MAT can allocate it again even if a stale match id was left behind.
@@ -469,17 +469,17 @@ namespace MatchZy
             JToken team2 = jsonDataObject["team2"]!;
             JToken maplist = jsonDataObject["maplist"]!;
 
-            if (team1["id"] != null) matchzyTeam1.id = team1["id"]!.ToString();
-            if (team2["id"] != null) matchzyTeam2.id = team2["id"]!.ToString();
+            if (team1["id"] != null) atTeam1.id = team1["id"]!.ToString();
+            if (team2["id"] != null) atTeam2.id = team2["id"]!.ToString();
 
-            matchzyTeam1.teamName = RemoveSpecialCharacters(team1["name"]!.ToString());
-            matchzyTeam2.teamName = RemoveSpecialCharacters(team2["name"]!.ToString());
-            matchzyTeam1.teamPlayers = team1["players"];
-            matchzyTeam2.teamPlayers = team2["players"];
+            atTeam1.teamName = RemoveSpecialCharacters(team1["name"]!.ToString());
+            atTeam2.teamName = RemoveSpecialCharacters(team2["name"]!.ToString());
+            atTeam1.teamPlayers = team1["players"];
+            atTeam2.teamPlayers = team2["players"];
 
             // Preserve any externally-configured remote log settings across match loads so that
-            // an outside controller (MatchZy Auto Tournament) does not need to constantly
-            // reapply them after every matchzy_loadmatch_url call.
+            // an outside controller (Auto Tournament) does not need to constantly
+            // reapply them after every at_loadmatch_url call.
             string previousRemoteLogUrl = matchConfig.RemoteLogURL;
             string previousRemoteLogHeaderKey = matchConfig.RemoteLogHeaderKey;
             string previousRemoteLogHeaderValue = matchConfig.RemoteLogHeaderValue;
@@ -525,8 +525,8 @@ namespace MatchZy
             if (isSimulationMode)
             {
                 // Validate that we actually have configured players for simulation.
-                bool team1HasPlayers = matchzyTeam1.teamPlayers is JObject t1 && t1.Properties().Any();
-                bool team2HasPlayers = matchzyTeam2.teamPlayers is JObject t2 && t2.Properties().Any();
+                bool team1HasPlayers = atTeam1.teamPlayers is JObject t1 && t1.Properties().Any();
+                bool team2HasPlayers = atTeam2.teamPlayers is JObject t2 && t2.Properties().Any();
 
                 if (!team1HasPlayers && !team2HasPlayers)
                 {
@@ -640,12 +640,12 @@ namespace MatchZy
                 });
             }
 
-            var seriesStartedEvent = new MatchZySeriesStartedEvent
+            var seriesStartedEvent = new AutoTournamentCS2SeriesStartedEvent
             {
                 MatchId = liveMatchId,
                 NumberOfMaps = matchConfig.NumMaps,
-                Team1 = new(matchzyTeam1.id, matchzyTeam1.teamName),
-                Team2 = new(matchzyTeam2.id, matchzyTeam2.teamName),
+                Team1 = new(atTeam1.id, atTeam1.teamName),
+                Team2 = new(atTeam2.id, atTeam2.teamName),
             };
 
             Task.Run(async () =>
@@ -662,18 +662,18 @@ namespace MatchZy
             int mapNumber = matchConfig.CurrentMapNumber;
             if (matchConfig.MapSides[mapNumber] == "team1_ct" || matchConfig.MapSides[mapNumber] == "team2_t")
             {
-                teamSides[matchzyTeam1] = "CT";
-                teamSides[matchzyTeam2] = "TERRORIST";
-                reverseTeamSides["CT"] = matchzyTeam1;
-                reverseTeamSides["TERRORIST"] = matchzyTeam2;
+                teamSides[atTeam1] = "CT";
+                teamSides[atTeam2] = "TERRORIST";
+                reverseTeamSides["CT"] = atTeam1;
+                reverseTeamSides["TERRORIST"] = atTeam2;
                 isKnifeRequired = false;
             }
             else if (matchConfig.MapSides[mapNumber] == "team2_ct" || matchConfig.MapSides[mapNumber] == "team1_t")
             {
-                teamSides[matchzyTeam2] = "CT";
-                teamSides[matchzyTeam1] = "TERRORIST";
-                reverseTeamSides["CT"] = matchzyTeam2;
-                reverseTeamSides["TERRORIST"] = matchzyTeam1;
+                teamSides[atTeam2] = "CT";
+                teamSides[atTeam1] = "TERRORIST";
+                reverseTeamSides["CT"] = atTeam2;
+                reverseTeamSides["TERRORIST"] = atTeam1;
                 isKnifeRequired = false;
             }
             else if (matchConfig.MapSides[mapNumber] == "knife")
@@ -747,7 +747,7 @@ namespace MatchZy
 
             // Optional: per-match admin SteamIDs. When present, these Steam64 IDs are treated
             // as admins for the duration of this match in addition to any global admins from
-            // CSSharp or MatchZy admins.json.
+            // CSSharp or Auto Tournament CS2 admins.json.
             if (jsonDataObject["admins"] != null)
             {
                 try
@@ -865,34 +865,34 @@ namespace MatchZy
             if (matchStarted)
             {
                 // ReplyToUserCommand(player, "Team names cannot be changed once the match is started!");
-                ReplyToUserCommand(player, Localizer["matchzy.mm.teamcannotbechanged"]);
+                ReplyToUserCommand(player, Localizer["at.mm.teamcannotbechanged"]);
                 return;
             }
             teamName = RemoveSpecialCharacters(teamName.Trim());
             if (teamName == "")
             {
                 // ReplyToUserCommand(player, $"Usage: !team{teamNum} <name>");
-                ReplyToUserCommand(player, Localizer["matchzy.cc.usage", $"!team{teamNum} <name>"]);
+                ReplyToUserCommand(player, Localizer["at.cc.usage", $"!team{teamNum} <name>"]);
             }
 
             if (teamNum == 1)
             {
-                matchzyTeam1.teamName = teamName;
-                teamSides[matchzyTeam1] = "CT";
-                reverseTeamSides["CT"] = matchzyTeam1;
-                foreach (var coach in matchzyTeam1.coach)
+                atTeam1.teamName = teamName;
+                teamSides[atTeam1] = "CT";
+                reverseTeamSides["CT"] = atTeam1;
+                foreach (var coach in atTeam1.coach)
                 {
-                    coach.Clan = $"[{matchzyTeam1.teamName} COACH]";
+                    coach.Clan = $"[{atTeam1.teamName} COACH]";
                 }
             }
             else if (teamNum == 2)
             {
-                matchzyTeam2.teamName = teamName;
-                teamSides[matchzyTeam2] = "TERRORIST";
-                reverseTeamSides["TERRORIST"] = matchzyTeam2;
-                foreach (var coach in matchzyTeam2.coach)
+                atTeam2.teamName = teamName;
+                teamSides[atTeam2] = "TERRORIST";
+                reverseTeamSides["TERRORIST"] = atTeam2;
+                foreach (var coach in atTeam2.coach)
                 {
-                    coach.Clan = $"[{matchzyTeam2.teamName} COACH]";
+                    coach.Clan = $"[{atTeam2.teamName} COACH]";
                 }
             }
             Server.ExecuteCommand($"mp_teamname_{teamNum} {teamName};");
@@ -901,11 +901,11 @@ namespace MatchZy
         public void SwapSidesInTeamData(bool swapTeams)
         {
             // if (swapTeams) {
-            //     // Here, we sync matchzyTeam1 and matchzyTeam2 with the actual team1 and team2
-            //     (matchzyTeam2, matchzyTeam1) = (matchzyTeam1, matchzyTeam2);
+            //     // Here, we sync atTeam1 and atTeam2 with the actual team1 and team2
+            //     (atTeam2, atTeam1) = (atTeam1, atTeam2);
             // }
 
-            (teamSides[matchzyTeam1], teamSides[matchzyTeam2]) = (teamSides[matchzyTeam2], teamSides[matchzyTeam1]);
+            (teamSides[atTeam1], teamSides[atTeam2]) = (teamSides[atTeam2], teamSides[atTeam1]);
             (reverseTeamSides["CT"], reverseTeamSides["TERRORIST"]) = (reverseTeamSides["TERRORIST"], reverseTeamSides["CT"]);
 
             // Send side_swap event
@@ -913,12 +913,12 @@ namespace MatchZy
             {
                 Log($"[SwapSidesInTeamData] Sending side_swap event");
 
-                var sideSwapEvent = new MatchZySideSwapEvent
+                var sideSwapEvent = new AutoTournamentCS2SideSwapEvent
                 {
                     MatchId = liveMatchId,
                     MapNumber = matchConfig.CurrentMapNumber,
-                    Team1Side = teamSides[matchzyTeam1],
-                    Team2Side = teamSides[matchzyTeam2]
+                    Team1Side = teamSides[atTeam1],
+                    Team2Side = teamSides[atTeam2]
                 };
 
                 Task.Run(async () =>
@@ -937,7 +937,7 @@ namespace MatchZy
                     // This is halftime
                     Log($"[SwapSidesInTeamData] Halftime detected, sending halftime_started event");
                     (int t1score, int t2score) = GetTeamsScore();
-                    var halftimeStartedEvent = new MatchZyHalftimeStartedEvent
+                    var halftimeStartedEvent = new AutoTournamentCS2HalftimeStartedEvent
                     {
                         MatchId = liveMatchId,
                         MapNumber = matchConfig.CurrentMapNumber,
@@ -960,7 +960,7 @@ namespace MatchZy
                         int overtimeNumber = (otround / (2 * roundsPerOTHalf)) + 1;
                         Log($"[SwapSidesInTeamData] Overtime detected, sending overtime_started event - OT#{overtimeNumber}");
 
-                        var overtimeStartedEvent = new MatchZyOvertimeStartedEvent
+                        var overtimeStartedEvent = new AutoTournamentCS2OvertimeStartedEvent
                         {
                             MatchId = liveMatchId,
                             MapNumber = matchConfig.CurrentMapNumber,
@@ -982,25 +982,25 @@ namespace MatchZy
             var steamId = player.SteamID;
             try
             {
-                if (matchzyTeam1.teamPlayers != null && matchzyTeam1.teamPlayers[steamId.ToString()] != null)
+                if (atTeam1.teamPlayers != null && atTeam1.teamPlayers[steamId.ToString()] != null)
                 {
-                    if (teamSides[matchzyTeam1] == "CT")
+                    if (teamSides[atTeam1] == "CT")
                     {
                         playerTeam = CsTeam.CounterTerrorist;
                     }
-                    else if (teamSides[matchzyTeam1] == "TERRORIST")
+                    else if (teamSides[atTeam1] == "TERRORIST")
                     {
                         playerTeam = CsTeam.Terrorist;
                     }
 
                 }
-                else if (matchzyTeam2.teamPlayers != null && matchzyTeam2.teamPlayers[steamId.ToString()] != null)
+                else if (atTeam2.teamPlayers != null && atTeam2.teamPlayers[steamId.ToString()] != null)
                 {
-                    if (teamSides[matchzyTeam2] == "CT")
+                    if (teamSides[atTeam2] == "CT")
                     {
                         playerTeam = CsTeam.CounterTerrorist;
                     }
-                    else if (teamSides[matchzyTeam2] == "TERRORIST")
+                    else if (teamSides[atTeam2] == "TERRORIST")
                     {
                         playerTeam = CsTeam.Terrorist;
                     }
@@ -1020,16 +1020,16 @@ namespace MatchZy
         public void EndSeries(string? winnerName, int restartDelay, int t1score, int t2score)
         {
             long matchId = liveMatchId;
-            (int team1Score, int team2Score) = (matchzyTeam1.seriesScore, matchzyTeam2.seriesScore);
-            Log($"[SeriesCheckpoint] SERIES END reached for match {matchId}. Final map score: {matchzyTeam1.teamName} {t1score} – {matchzyTeam2.teamName} {t2score}. Final series score: {matchzyTeam1.teamName} {team1Score} – {matchzyTeam2.teamName} {team2Score}.");
+            (int team1Score, int team2Score) = (atTeam1.seriesScore, atTeam2.seriesScore);
+            Log($"[SeriesCheckpoint] SERIES END reached for match {matchId}. Final map score: {atTeam1.teamName} {t1score} – {atTeam2.teamName} {t2score}. Final series score: {atTeam1.teamName} {team1Score} – {atTeam2.teamName} {team2Score}.");
 
             // The series winner is decided by the series score alone. Callers pass the
             // winner of the *last map*, which is not the series winner when a series is
             // played out (e.g. 2-1 where the loser took the final map) and is "Draw"
             // for a drawn final map.
             string winnerTeam = MatchLogic.ResolveMapWinnerSlot(team1Score, team2Score, null);
-            string? seriesWinnerName = winnerTeam == MatchLogic.Team1 ? matchzyTeam1.teamName
-                : winnerTeam == MatchLogic.Team2 ? matchzyTeam2.teamName
+            string? seriesWinnerName = winnerTeam == MatchLogic.Team1 ? atTeam1.teamName
+                : winnerTeam == MatchLogic.Team2 ? atTeam2.teamName
                 : null;
             if (seriesWinnerName != winnerName)
             {
@@ -1039,18 +1039,18 @@ namespace MatchZy
 
             if (winnerName == null)
             {
-                PrintToAllChat($"{ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} and {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} have tied the match");
+                PrintToAllChat($"{ChatColors.Green}{atTeam1.teamName}{ChatColors.Default} and {ChatColors.Green}{atTeam2.teamName}{ChatColors.Default} have tied the match");
             }
             else
             {
                 Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{winnerName}{ChatColors.Default} has won the match");
             }
 
-            var seriesResultEvent = new MatchZySeriesResultEvent()
+            var seriesResultEvent = new AutoTournamentCS2SeriesResultEvent()
             {
                 MatchId = matchId,
                 // Side is the side the series winner finished the last map on ("0" for a draw).
-                Winner = new Winner(MatchLogic.SideNumberForSlot(winnerTeam, teamSides[matchzyTeam1]), winnerTeam),
+                Winner = new Winner(MatchLogic.SideNumberForSlot(winnerTeam, teamSides[atTeam1]), winnerTeam),
                 Team1SeriesScore = team1Score,
                 Team2SeriesScore = team2Score,
                 TimeUntilRestore = 10,
@@ -1146,7 +1146,7 @@ namespace MatchZy
                 string? kickReason = null;
                 if (!string.IsNullOrEmpty(winnerName))
                 {
-                    kickReason = Localizer["matchzy.match.won", winnerName];
+                    kickReason = Localizer["at.match.won", winnerName];
                 }
                 
                 foreach (var player in playerEntities)

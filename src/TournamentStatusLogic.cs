@@ -1,8 +1,8 @@
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>
-/// Pure rules for the tournament status convars (matchzy_tournament_status /
-/// matchzy_tournament_match), kept free of CounterStrikeSharp so they can be unit tested.
+/// Pure rules for the tournament status convars (at_tournament_status /
+/// at_tournament_match), kept free of CounterStrikeSharp so they can be unit tested.
 ///
 /// MAT decides whether a server is free from these convars: "idle", or "warmup" with no
 /// match, is free. So whenever the plugin is back in an idle state the match convar has to
@@ -27,7 +27,7 @@ public static class TournamentStatusLogic
     }
 
     /// <summary>
-    /// The value matchzy_tournament_match should hold after publishing <paramref name="newStatus"/>.
+    /// The value at_tournament_match should hold after publishing <paramref name="newStatus"/>.
     /// - "idle" never carries a match.
     /// - With no active match (after a reset, series end, autostart warmup) the match is cleared.
     /// - Otherwise an explicit slug replaces the current one, and an empty slug keeps it.

@@ -9,9 +9,9 @@ using System.Threading.Tasks;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Timers;
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
         private static readonly HttpClient MatHeartbeatHttpClient = new()
         {
@@ -121,7 +121,7 @@ namespace MatchZy
 
                     if (!string.IsNullOrWhiteSpace(token))
                     {
-                        request.Headers.TryAddWithoutValidation("x-matchzy-token", token);
+                        request.Headers.TryAddWithoutValidation("x-auto-tournament-token", token);
                     }
 
                     var response = await MatHeartbeatHttpClient.SendAsync(request).ConfigureAwait(false);
@@ -228,7 +228,7 @@ namespace MatchZy
                 "playing" => "live",
                 "postgame" => "postgame",
                 "error" => "error",
-                // MatchZy-only / extra phases (MAT only accepts a smaller set)
+                // Plugin-only / extra phases (MAT only accepts a smaller set)
                 "knife" => "live",
                 "paused" => "live",
                 "halftime" => "live",

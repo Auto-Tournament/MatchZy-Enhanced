@@ -13,7 +13,7 @@ using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 using Newtonsoft.Json.Linq;
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
 public record MatchReportPayload
 {
@@ -132,7 +132,7 @@ public record MatchReportUploadEnvelope
     public MatchReportPayload Report { get; init; } = new();
 }
 
-public partial class MatchZy : BasePlugin
+public partial class AutoTournamentCS2 : BasePlugin
 {
     private static readonly JsonSerializerOptions MatchReportSerializerOptions = new()
     {
@@ -141,7 +141,7 @@ public partial class MatchZy : BasePlugin
         WriteIndented = true
     };
 
-    [ConsoleCommand("matchzy_match_report", "Returns a structured JSON snapshot of the current match state")]
+    [ConsoleCommand("at_match_report", "Returns a structured JSON snapshot of the current match state")]
     [ConsoleCommand("css_match_report", "Returns a structured JSON snapshot of the current match state")]
     public void OnMatchReportCommand(CCSPlayerController? player, CommandInfo command)
     {
@@ -237,8 +237,8 @@ public partial class MatchZy : BasePlugin
                 Team2 = team2Score,
                 Series = new MatchReportSeriesScore
                 {
-                    Team1 = matchzyTeam1.seriesScore,
-                    Team2 = matchzyTeam2.seriesScore
+                    Team1 = atTeam1.seriesScore,
+                    Team2 = atTeam2.seriesScore
                 }
                 },
                 Paused = isPaused,
@@ -254,8 +254,8 @@ public partial class MatchZy : BasePlugin
 
         Dictionary<string, MatchReportTeam> teamsSection = new()
         {
-            ["team1"] = BuildTeamReport(matchzyTeam1, "team1", team1Score, team1Connections),
-            ["team2"] = BuildTeamReport(matchzyTeam2, "team2", team2Score, team2Connections)
+            ["team1"] = BuildTeamReport(atTeam1, "team1", team1Score, team1Connections),
+            ["team2"] = BuildTeamReport(atTeam2, "team2", team2Score, team2Connections)
         };
 
         MatchReportSpectatorInfo spectators = new()
@@ -305,7 +305,7 @@ public partial class MatchZy : BasePlugin
 
             string slot = ResolvePlayerSlot(player);
             bool readyFlag = playerReadyStatus.TryGetValue(entry.Key, out bool readyState) && readyState;
-            bool isCoach = matchzyTeam1.coach.Contains(player) || matchzyTeam2.coach.Contains(player);
+            bool isCoach = atTeam1.coach.Contains(player) || atTeam2.coach.Contains(player);
             long connectedAt = playerConnectionTimes.TryGetValue(player.SteamID, out long timestamp)
                 ? timestamp
                 : fallbackTimestamp;
@@ -338,8 +338,8 @@ public partial class MatchZy : BasePlugin
 
     private string ResolvePlayerSlot(CCSPlayerController player)
     {
-        if (matchzyTeam1.coach.Contains(player)) return "team1";
-        if (matchzyTeam2.coach.Contains(player)) return "team2";
+        if (atTeam1.coach.Contains(player)) return "team1";
+        if (atTeam2.coach.Contains(player)) return "team2";
 
         if (isSimulationMode && player.UserId.HasValue &&
             simulationPlayersByUserId.TryGetValue(player.UserId.Value, out var identity))
@@ -348,17 +348,17 @@ public partial class MatchZy : BasePlugin
         }
 
         string steamId = player.SteamID.ToString();
-        if (PlayerIsInConfig(matchzyTeam1.teamPlayers, steamId)) return "team1";
-        if (PlayerIsInConfig(matchzyTeam2.teamPlayers, steamId)) return "team2";
+        if (PlayerIsInConfig(atTeam1.teamPlayers, steamId)) return "team1";
+        if (PlayerIsInConfig(atTeam2.teamPlayers, steamId)) return "team2";
 
         if (player.Team == CsTeam.CounterTerrorist && reverseTeamSides.TryGetValue("CT", out var ctTeam))
         {
-            return ctTeam == matchzyTeam1 ? "team1" : "team2";
+            return ctTeam == atTeam1 ? "team1" : "team2";
         }
 
         if (player.Team == CsTeam.Terrorist && reverseTeamSides.TryGetValue("TERRORIST", out var tTeam))
         {
-            return tTeam == matchzyTeam1 ? "team1" : "team2";
+            return tTeam == atTeam1 ? "team1" : "team2";
         }
 
         if (player.Team == CsTeam.Spectator) return "spectator";
@@ -382,8 +382,8 @@ public partial class MatchZy : BasePlugin
     {
         return slot switch
         {
-            "team1" => teamSides.TryGetValue(matchzyTeam1, out var ctSide) ? ctSide.ToLowerInvariant() : "ct",
-            "team2" => teamSides.TryGetValue(matchzyTeam2, out var tSide) ? tSide.ToLowerInvariant() : "t",
+            "team1" => teamSides.TryGetValue(atTeam1, out var ctSide) ? ctSide.ToLowerInvariant() : "ct",
+            "team2" => teamSides.TryGetValue(atTeam2, out var tSide) ? tSide.ToLowerInvariant() : "t",
             "spectator" => "spectator",
             _ => "unknown"
         };
@@ -475,23 +475,23 @@ public partial class MatchZy : BasePlugin
 
         if (reverseTeamSides.TryGetValue("CT", out var ctTeam) && pauseSource.Equals(ctTeam.teamName, StringComparison.OrdinalIgnoreCase))
         {
-            return ctTeam == matchzyTeam1 ? "team1" : "team2";
+            return ctTeam == atTeam1 ? "team1" : "team2";
         }
 
         if (reverseTeamSides.TryGetValue("TERRORIST", out var tTeam) && pauseSource.Equals(tTeam.teamName, StringComparison.OrdinalIgnoreCase))
         {
-            return tTeam == matchzyTeam1 ? "team1" : "team2";
+            return tTeam == atTeam1 ? "team1" : "team2";
         }
 
         if (pauseSource.Equals("ct", StringComparison.OrdinalIgnoreCase))
         {
-            return reverseTeamSides.TryGetValue("CT", out ctTeam) && ctTeam == matchzyTeam1 ? "team1" : "team2";
+            return reverseTeamSides.TryGetValue("CT", out ctTeam) && ctTeam == atTeam1 ? "team1" : "team2";
         }
 
         if (pauseSource.Equals("t", StringComparison.OrdinalIgnoreCase) ||
             pauseSource.Equals("terrorist", StringComparison.OrdinalIgnoreCase))
         {
-            return reverseTeamSides.TryGetValue("TERRORIST", out tTeam) && tTeam == matchzyTeam1 ? "team1" : "team2";
+            return reverseTeamSides.TryGetValue("TERRORIST", out tTeam) && tTeam == atTeam1 ? "team1" : "team2";
         }
 
         return pauseSource.Equals("admin", StringComparison.OrdinalIgnoreCase) ? "admin" : "";
@@ -521,7 +521,7 @@ public partial class MatchZy : BasePlugin
         {
             try
             {
-                Server.NextFrame(() => Server.PrintToConsole($"[MatchZy] Uploading match report (attempt {attempt}/{maxAttempts})..."));
+                Server.NextFrame(() => Server.PrintToConsole($"[Auto Tournament] Uploading match report (attempt {attempt}/{maxAttempts})..."));
                 using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
                 {
                     Content = new StringContent(jsonBody, Encoding.UTF8, "application/json")
@@ -529,14 +529,14 @@ public partial class MatchZy : BasePlugin
 
                 if (!string.IsNullOrWhiteSpace(token))
                 {
-                    request.Headers.TryAddWithoutValidation("x-matchzy-token", token);
+                    request.Headers.TryAddWithoutValidation("x-auto-tournament-token", token);
                 }
 
                 HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
                 string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 if (response.IsSuccessStatusCode && ResponseIndicatesSuccess(responseBody))
                 {
-                    Server.NextFrame(() => Server.PrintToConsole($"[MatchZy] Match report upload succeeded ({(int)response.StatusCode})"));
+                    Server.NextFrame(() => Server.PrintToConsole($"[Auto Tournament] Match report upload succeeded ({(int)response.StatusCode})"));
                     return true;
                 }
 
@@ -555,7 +555,7 @@ public partial class MatchZy : BasePlugin
 
         if (fallbackToConsole)
         {
-            Server.NextFrame(() => Server.PrintToConsole("[MatchZy] Match report upload failed after retries. Falling back to console output."));
+            Server.NextFrame(() => Server.PrintToConsole("[Auto Tournament] Match report upload failed after retries. Falling back to console output."));
         }
         return false;
     }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>
 /// Keeps secrets out of logs, console output and chat. Server logs get pasted into Discord and
@@ -16,14 +16,14 @@ public static class SecretRedactor
     /// <summary>Config keys and convars whose values are secrets, whatever their name looks like.</summary>
     public static readonly IReadOnlySet<string> SecretKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "matchzy_bootstrap_token",
-        "matchzy_match_token",
-        "matchzy_report_token",
-        "matchzy_remote_log_header_value",
+        "at_bootstrap_token",
+        "at_match_token",
+        "at_report_token",
+        "at_remote_log_header_value",
         "get5_remote_log_header_value",
-        "matchzy_demo_upload_header_value",
+        "at_demo_upload_header_value",
         "get5_demo_upload_header_value",
-        "matchzy_remote_backup_header_value",
+        "at_remote_backup_header_value",
         "get5_remote_backup_header_value",
         "remote_log_header_value",
         "sv_password",
@@ -35,7 +35,7 @@ public static class SecretRedactor
     // Any other config/convar name containing one of these is treated as a secret too.
     private static readonly string[] SecretKeyFragments = { "token", "password", "passwd", "secret", "header_value", "api_key", "apikey" };
 
-    // HTTP header names that carry credentials. Custom header names (e.g. matchzy_remote_log_header_key)
+    // HTTP header names that carry credentials. Custom header names (e.g. at_remote_log_header_key)
     // are passed in by the caller, since they can be anything.
     private static readonly string[] SecretHeaderFragments = { "token", "password", "secret", "auth", "cookie", "api-key", "apikey", "api_key" };
 
@@ -125,8 +125,8 @@ public static class SecretRedactor
 
     /// <summary>
     /// Redacts a single console command line or a list of commands separated by <c>;</c> or newlines,
-    /// e.g. a bootstrap payload command <c>matchzy_bootstrap_token "abc"</c> becomes
-    /// <c>matchzy_bootstrap_token "(hidden, 3 chars)"</c>.
+    /// e.g. a bootstrap payload command <c>at_bootstrap_token "abc"</c> becomes
+    /// <c>at_bootstrap_token "(hidden, 3 chars)"</c>.
     /// </summary>
     public static string RedactCommand(string? command)
     {

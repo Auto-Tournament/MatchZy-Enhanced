@@ -14,14 +14,14 @@ using System.Drawing;
 using System.IO;
 
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
-        public const string warmupCfgPath = "MatchZy/warmup.cfg";
-        public const string knifeCfgPath = "MatchZy/knife.cfg";
-        public const string liveCfgPath = "MatchZy/live.cfg";
-        public const string liveWingmanCfgPath = "MatchZy/live_wingman.cfg";
+        public const string warmupCfgPath = "AutoTournamentCS2/warmup.cfg";
+        public const string knifeCfgPath = "AutoTournamentCS2/knife.cfg";
+        public const string liveCfgPath = "AutoTournamentCS2/live.cfg";
+        public const string liveWingmanCfgPath = "AutoTournamentCS2/live_wingman.cfg";
         private static readonly Regex SafeCVarValuePattern = new(@"^(?:[+-]?(?:\d+\.?\d*|\.\d+)|true|false|on|off|yes|no)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         private void PrintToAllChat(string message)
@@ -45,10 +45,10 @@ namespace MatchZy
                 Log($"[CrashBreadcrumb] {line}");
 
                 // File log (so we can see the last step even after a segfault)
-                string logDir = Path.Combine(Server.GameDirectory, "csgo", "cfg", "MatchZy", "logs");
+                string logDir = Path.Combine(Server.GameDirectory, "csgo", "cfg", "AutoTournamentCS2", "logs");
                 Directory.CreateDirectory(logDir);
 
-                string logPath = Path.Combine(logDir, "matchzy_breadcrumbs.log");
+                string logPath = Path.Combine(logDir, "at_breadcrumbs.log");
                 File.AppendAllText(logPath, line + Environment.NewLine);
             }
             catch
@@ -58,7 +58,7 @@ namespace MatchZy
         }
 
         /// <summary>
-        /// Map-change breadcrumb (matchzy_crash_debug_breadcrumbs). Adds the state that
+        /// Map-change breadcrumb (at_crash_debug_breadcrumbs). Adds the state that
         /// matters for "crashes on map change with 5+ players / long uptime" reports:
         /// how many controllers the plugin still holds from the previous map, coaches,
         /// pending per-player timers, and process memory / uptime for leak hunting.
@@ -76,7 +76,7 @@ namespace MatchZy
                 long workingSetMb = process.WorkingSet64 / (1024 * 1024);
                 long managedMb = GC.GetTotalMemory(false) / (1024 * 1024);
                 stats = $"trackedPlayers={playerData.Count} readyEntries={playerReadyStatus.Count} " +
-                        $"coaches={matchzyTeam1.coach.Count + matchzyTeam2.coach.Count} " +
+                        $"coaches={atTeam1.coach.Count + atTeam2.coach.Count} " +
                         $"autoReadyTimers={autoReadyPendingReadyTimers.Count} practiceTimers={playerTimers.Count} " +
                         $"matchSetup={isMatchSetup} live={isMatchLive} practice={isPractice} sim={isSimulationMode} " +
                         $"uptimeMin={uptimeMinutes:0} workingSetMB={workingSetMb} managedMB={managedMb}";
@@ -127,7 +127,7 @@ namespace MatchZy
             if (!centerHtmlNotifications.Value) return;
             
             // Determine which team number (2=T, 3=CT)
-            var team = teamName == matchzyTeam1.teamName ? matchzyTeam1 : matchzyTeam2;
+            var team = teamName == atTeam1.teamName ? atTeam1 : atTeam2;
             string teamSide = teamSides.ContainsKey(team) ? teamSides[team] : "";
             int teamNum = teamSide == "CT" ? 3 : 2;
             
@@ -375,7 +375,7 @@ namespace MatchZy
 
         private void LoadAdmins()
         {
-            string fileName = "MatchZy/admins.json";
+            string fileName = "AutoTournamentCS2/admins.json";
             string filePath = Path.Join(Server.GameDirectory + "/csgo/cfg", fileName);
 
             if (File.Exists(filePath))
@@ -445,7 +445,7 @@ namespace MatchZy
 
         private bool IsPlayerAdmin(CCSPlayerController? player, string command = "", params string[] permissions)
         {
-            // Global override: everyone is treated as admin if matchzy_everyone_is_admin is true.
+            // Global override: everyone is treated as admin if at_everyone_is_admin is true.
             if (everyoneIsAdmin.Value)
             {
                 return true;
@@ -488,7 +488,7 @@ namespace MatchZy
                 return true;
             }
 
-            // Legacy MatchZy-specific admins.json (csgo/cfg/MatchZy/admins.json).
+            // Legacy plugin-specific admins.json (csgo/cfg/AutoTournamentCS2/admins.json).
             if (loadedAdmins.ContainsKey(player.SteamID.ToString()))
             {
                 return true;
@@ -568,11 +568,11 @@ namespace MatchZy
                 // Server.PrintToChatAll($"{chatPrefix} Unready players: {unreadyPlayerList}. Please type .ready to ready up! {minimumReadyRequiredMessage}");
                 if (isRoundRestorePending)
                 {
-                    PrintToAllChat(Localizer["matchzy.ready.readytotestorebackupinfomessage", unreadyPlayerList, minimumReadyRequiredMessage]);
+                    PrintToAllChat(Localizer["at.ready.readytotestorebackupinfomessage", unreadyPlayerList, minimumReadyRequiredMessage]);
                 }
                 else
                 {
-                    PrintToAllChat(Localizer["matchzy.utility.unreadyplayers", unreadyPlayerList, minimumReadyRequiredMessage]);
+                    PrintToAllChat(Localizer["at.utility.unreadyplayers", unreadyPlayerList, minimumReadyRequiredMessage]);
                 }
             }
             else
@@ -581,12 +581,12 @@ namespace MatchZy
                 if (isMatchSetup)
                 {
                     // Server.PrintToChatAll($"{chatPrefix} Current ready players: {ChatColors.Green}{countOfReadyPlayers}{ChatColors.Default}");
-                    PrintToAllChat(Localizer["matchzy.utility.readyplayers", countOfReadyPlayers]);
+                    PrintToAllChat(Localizer["at.utility.readyplayers", countOfReadyPlayers]);
                 }
                 else
                 {
                     // Server.PrintToChatAll($"{chatPrefix} Minimum ready players required {ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}, current ready players: {ChatColors.Green}{countOfReadyPlayers}{ChatColors.Default}");
-                    PrintToAllChat(Localizer["matchzy.utility.minimumreadyplayers", minimumReadyRequired, countOfReadyPlayers]);
+                    PrintToAllChat(Localizer["at.utility.minimumreadyplayers", minimumReadyRequired, countOfReadyPlayers]);
                 }
             }
         }
@@ -598,23 +598,23 @@ namespace MatchZy
                 var pauseTeamName = unpauseData["pauseTeam"];
                 if ((string)pauseTeamName == "Admin")
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.adminpausedthematch"]);
+                    PrintToAllChat(Localizer["at.pause.adminpausedthematch"]);
                 }
                 else if ((string)pauseTeamName == "RoundRestore" && !(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.pausedbecauserestore"]);
+                    PrintToAllChat(Localizer["at.pause.pausedbecauserestore"]);
                 }
                 else if ((bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName]);
+                    PrintToAllChat(Localizer["at.pause.teamwantstounpause", reverseTeamSides["TERRORIST"].teamName, reverseTeamSides["CT"].teamName]);
                 }
                 else if (!(bool)unpauseData["t"] && (bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName]);
+                    PrintToAllChat(Localizer["at.pause.teamwantstounpause", reverseTeamSides["CT"].teamName, reverseTeamSides["TERRORIST"].teamName]);
                 }
                 else if (!(bool)unpauseData["t"] && !(bool)unpauseData["ct"])
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.pausedthematch", pauseTeamName]);
+                    PrintToAllChat(Localizer["at.pause.pausedthematch", pauseTeamName]);
                 }
             }
         }
@@ -624,7 +624,7 @@ namespace MatchZy
             var absolutePath = Path.Join(Server.GameDirectory + "/csgo/cfg", warmupCfgPath);
 
             string warmupFullPath = Path.Join(Server.GameDirectory + "/csgo/cfg", warmupCfgPath);
-            string humansCfgPath = "MatchZy/humans.cfg";
+            string humansCfgPath = "AutoTournamentCS2/humans.cfg";
             string humansFullPath = Path.Join(Server.GameDirectory + "/csgo/cfg", humansCfgPath);
 
             bool warmupExists = File.Exists(warmupFullPath);
@@ -707,7 +707,7 @@ namespace MatchZy
 
             // Send warmup_ended event
             Log($"[StartKnifeRound] Sending warmup_ended event");
-            var warmupEndedEvent = new MatchZyWarmupEndedEvent
+            var warmupEndedEvent = new AutoTournamentCS2WarmupEndedEvent
             {
                 MatchId = liveMatchId,
                 MapNumber = matchConfig.CurrentMapNumber
@@ -726,7 +726,7 @@ namespace MatchZy
 
             // Send knife_round_started event
             Log($"[StartKnifeRound] Sending knife_round_started event");
-            var knifeStartedEvent = new MatchZyKnifeRoundStartedEvent
+            var knifeStartedEvent = new AutoTournamentCS2KnifeRoundStartedEvent
             {
                 MatchId = liveMatchId,
                 MapNumber = matchConfig.CurrentMapNumber
@@ -751,7 +751,7 @@ namespace MatchZy
 
                 // Randomly pick a winner slot for the knife event payload.
                 string winnerSlot = new Random().Next(0, 2) == 0 ? "team1" : "team2";
-                var knifeEndedEvent = new MatchZyKnifeRoundEndedEvent
+                var knifeEndedEvent = new AutoTournamentCS2KnifeRoundEndedEvent
                 {
                     MatchId = liveMatchId,
                     MapNumber = matchConfig.CurrentMapNumber,
@@ -819,7 +819,7 @@ namespace MatchZy
                     else
                     {
                         // Avoid executing knife.cfg in bots-only mode. Your logs show CS2 segfaulting
-                        // immediately after the server "execing MatchZy/knife.cfg" when no humans are connected.
+                        // immediately after the server "execing AutoTournamentCS2/knife.cfg" when no humans are connected.
                         // Instead, apply the knife settings *without* mp_restartgame/mp_warmup_end here, and
                         // then drive the transition using the experimental modes below.
                         CrashBreadcrumb($"StartKnifeRound: bots-only - skipping exec {knifeCfgPath}, applying safe knife settings");
@@ -1024,22 +1024,22 @@ namespace MatchZy
 
                 if (team1StartsCT)
                 {
-                    teamSides[matchzyTeam1] = "CT";
-                    teamSides[matchzyTeam2] = "TERRORIST";
-                    reverseTeamSides["CT"] = matchzyTeam1;
-                    reverseTeamSides["TERRORIST"] = matchzyTeam2;
+                    teamSides[atTeam1] = "CT";
+                    teamSides[atTeam2] = "TERRORIST";
+                    reverseTeamSides["CT"] = atTeam1;
+                    reverseTeamSides["TERRORIST"] = atTeam2;
                 }
                 else
                 {
-                    teamSides[matchzyTeam1] = "TERRORIST";
-                    teamSides[matchzyTeam2] = "CT";
-                    reverseTeamSides["CT"] = matchzyTeam2;
-                    reverseTeamSides["TERRORIST"] = matchzyTeam1;
+                    teamSides[atTeam1] = "TERRORIST";
+                    teamSides[atTeam2] = "CT";
+                    reverseTeamSides["CT"] = atTeam2;
+                    reverseTeamSides["TERRORIST"] = atTeam1;
                 }
 
                 isKnifeRequired = false;
                 SetTeamNames();
-                Log($"[SimulationMode] Randomized sides - team1: {teamSides[matchzyTeam1]}, team2: {teamSides[matchzyTeam2]}");
+                Log($"[SimulationMode] Randomized sides - team1: {teamSides[atTeam1]}, team2: {teamSides[atTeam2]}");
             }
             catch (Exception e)
             {
@@ -1050,7 +1050,7 @@ namespace MatchZy
         private void SendSideSelectionMessage()
         {
             if (!isSideSelectionPhase) return;
-            PrintToAllChat(Localizer["matchzy.knife.sidedecisionpending", knifeWinnerName]);
+            PrintToAllChat(Localizer["at.knife.sidedecisionpending", knifeWinnerName]);
             ShowNotification($"🔪 {knifeWinnerName} WON KNIFE<br>Waiting for side selection...", "#ffaa00", 20);
             // Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{knifeWinnerName}{ChatColors.Default} Won the knife. Waiting for them to type {ChatColors.Green}.stay{ChatColors.Default} or {ChatColors.Green}.switch{ChatColors.Default}");
         }
@@ -1069,7 +1069,7 @@ namespace MatchZy
             if (sideSelectionEnabled.Value && sideSelectionSeconds > 0)
             {
                 sideSelectionRemainingSeconds = sideSelectionSeconds;
-                PrintToAllChat(Localizer["matchzy.knife.sidedecisionpendingwithtimer", knifeWinnerName, sideSelectionSeconds]);
+                PrintToAllChat(Localizer["at.knife.sidedecisionpendingwithtimer", knifeWinnerName, sideSelectionSeconds]);
                 
                 // Show countdown on center screen (will replace the initial notification)
                 StartCountdown(sideSelectionSeconds, $"🔪 {knifeWinnerName} SIDE SELECTION<br>{{0}}s remaining", "#ffaa00");
@@ -1093,11 +1093,11 @@ namespace MatchZy
                         {
                             Server.ExecuteCommand("mp_swapteams;");
                             SwapSidesInTeamData(true);
-                            PrintToAllChat(Localizer["matchzy.knife.timerexpiredrandomswap", knifeWinnerName]);
+                            PrintToAllChat(Localizer["at.knife.timerexpiredrandomswap", knifeWinnerName]);
                         }
                         else
                         {
-                            PrintToAllChat(Localizer["matchzy.knife.timerexpiredrandomstay", knifeWinnerName]);
+                            PrintToAllChat(Localizer["at.knife.timerexpiredrandomstay", knifeWinnerName]);
                         }
                         
                         StartLive();
@@ -1132,12 +1132,12 @@ namespace MatchZy
                     }
                     
                     // Show remaining time
-                    PrintToAllChat(Localizer["matchzy.knife.sidetimeremaining", knifeWinnerName, sideSelectionRemainingSeconds]);
+                    PrintToAllChat(Localizer["at.knife.sidetimeremaining", knifeWinnerName, sideSelectionRemainingSeconds]);
                 }, TimerFlags.REPEAT);
             }
             else
             {
-                PrintToAllChat(Localizer["matchzy.knife.sidedecisionpending", knifeWinnerName]);
+                PrintToAllChat(Localizer["at.knife.sidedecisionpending", knifeWinnerName]);
                 // Show notification for side selection without timer
                 ShowNotification($"🔪 {knifeWinnerName} WON KNIFE<br>Waiting for side selection...", "#ffaa00", 22);
             }
@@ -1184,26 +1184,26 @@ namespace MatchZy
             CrashBreadcrumb("StartLive: after StartDemoRecording");
 
             // Storing 0-0 score backup file as lastBackupFileName, so that .stop functions properly in first round.
-            lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
-            lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.json";
+            lastBackupFileName = $"at_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.txt";
+            lastAutoTournamentCS2BackupFileName = $"at_{liveMatchId}_{matchConfig.CurrentMapNumber}_round00.json";
 
             // This is to reload the map once it is over so that all flags are reset accordingly
             Server.ExecuteCommand("mp_match_end_restart true");
 
             // Professional LIVE announcement + short core command help for players
-            PrintToAllChat($"{ChatColors.Lime}MATCH LIVE{ChatColors.Default} — {ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} vs {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default}. Good luck & have fun!");
+            PrintToAllChat($"{ChatColors.Lime}MATCH LIVE{ChatColors.Default} — {ChatColors.Green}{atTeam1.teamName}{ChatColors.Default} vs {ChatColors.Green}{atTeam2.teamName}{ChatColors.Default}. Good luck & have fun!");
             
             // Display match rules and configuration
             DisplayMatchRules();
             
             // Show center notification
-            ShowNotification($"🔴 MATCH LIVE 🔴<br>{matchzyTeam1.teamName} vs {matchzyTeam2.teamName}", "#00ff00", 24);
+            ShowNotification($"🔴 MATCH LIVE 🔴<br>{atTeam1.teamName} vs {atTeam2.teamName}", "#00ff00", 24);
 
             // Send warmup_ended event if not coming from knife round
             if (!isSideSelectionPhase)
             {
                 Log($"[StartLive] Sending warmup_ended event");
-                var warmupEndedEvent = new MatchZyWarmupEndedEvent
+                var warmupEndedEvent = new AutoTournamentCS2WarmupEndedEvent
                 {
                     MatchId = liveMatchId,
                     MapNumber = matchConfig.CurrentMapNumber
@@ -1339,7 +1339,7 @@ namespace MatchZy
                 sideSelectionRemainingSeconds = 0;
 
                 lastBackupFileName = "";
-                lastMatchZyBackupFileName = "";
+                lastAutoTournamentCS2BackupFileName = "";
 
                 isRoundRestorePending = false;
                 playerHasTakenDamage = false;
@@ -1378,11 +1378,11 @@ namespace MatchZy
                 nadeSpecificLastGrenadeData = new();
                 UnpauseMatch();
 
-                matchzyTeam1.teamName = "COUNTER-TERRORISTS";
-                matchzyTeam2.teamName = "TERRORISTS";
+                atTeam1.teamName = "COUNTER-TERRORISTS";
+                atTeam2.teamName = "TERRORISTS";
 
-                matchzyTeam1.teamPlayers = null;
-                matchzyTeam2.teamPlayers = null;
+                atTeam1.teamPlayers = null;
+                atTeam2.teamPlayers = null;
 
                 HashSet<CCSPlayerController> coaches = GetAllCoaches();
 
@@ -1393,21 +1393,21 @@ namespace MatchZy
                     SetPlayerVisible(coach);
                 }
 
-                matchzyTeam1.coach = new();
-                matchzyTeam2.coach = new();
+                atTeam1.coach = new();
+                atTeam2.coach = new();
                 coachKillTimer?.Kill();
                 coachKillTimer = null;
 
-                matchzyTeam1.seriesScore = 0;
-                matchzyTeam2.seriesScore = 0;
+                atTeam1.seriesScore = 0;
+                atTeam2.seriesScore = 0;
 
-                Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
-                Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
+                Server.ExecuteCommand($"mp_teamname_1 {atTeam1.teamName}");
+                Server.ExecuteCommand($"mp_teamname_2 {atTeam2.teamName}");
 
-                teamSides[matchzyTeam1] = "CT";
-                teamSides[matchzyTeam2] = "TERRORIST";
-                reverseTeamSides["CT"] = matchzyTeam1;
-                reverseTeamSides["TERRORIST"] = matchzyTeam2;
+                teamSides[atTeam1] = "CT";
+                teamSides[atTeam2] = "TERRORIST";
+                reverseTeamSides["CT"] = atTeam1;
+                reverseTeamSides["TERRORIST"] = atTeam2;
 
                 // Keeping the log URLs to avoid their reset on match start.
                 matchConfig = new()
@@ -1685,13 +1685,13 @@ namespace MatchZy
             if (matchStarted)
             {
                 // ReplyToUserCommand(player, $"Map cannot be changed once the match is started!");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.matchstarted"]);
+                ReplyToUserCommand(player, Localizer["at.utility.matchstarted"]);
                 return;
             }
 
             if (!ExecuteMapChange(mapName, "MapChange"))
             {
-                ReplyToUserCommand(player, Localizer["matchzy.cc.invalidmap"]);
+                ReplyToUserCommand(player, Localizer["at.cc.invalidmap"]);
             }
         }
 
@@ -1753,20 +1753,20 @@ namespace MatchZy
                     minimumReadyRequired = readyRequired;
                     string minimumReadyRequiredFormatted = (player == null) ? $"{minimumReadyRequired}" : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
                     // ReplyToUserCommand(player, $"Minimum ready players required to start the match are now set to: {minimumReadyRequiredFormatted}");
-                    ReplyToUserCommand(player, Localizer["matchzy.utility.minreadyplayers", minimumReadyRequiredFormatted]);
+                    ReplyToUserCommand(player, Localizer["at.utility.minreadyplayers", minimumReadyRequiredFormatted]);
                     CheckLiveRequired();
                 }
                 else
                 {
                     // ReplyToUserCommand(player, $"Invalid value for readyrequired. Please specify a valid non-negative number. Usage: !readyrequired <number_of_ready_players_required>");
-                    ReplyToUserCommand(player, Localizer["matchzy.utility.rrinvalidvalue"]);
+                    ReplyToUserCommand(player, Localizer["at.utility.rrinvalidvalue"]);
                 }
             }
             else
             {
                 string minimumReadyRequiredFormatted = (player == null) ? $"{minimumReadyRequired}" : $"{ChatColors.Green}{minimumReadyRequired}{ChatColors.Default}";
                 // ReplyToUserCommand(player, $"Current Ready Required: {minimumReadyRequiredFormatted} .Usage: !readyrequired <number_of_ready_players_required>");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.currentreadyrequired", minimumReadyRequiredFormatted]);
+                ReplyToUserCommand(player, Localizer["at.utility.currentreadyrequired", minimumReadyRequiredFormatted]);
             }
         }
 
@@ -1855,8 +1855,8 @@ namespace MatchZy
 
             // If we don't have explicit per-team player rosters, fall back to the existing
             // players_per_team readiness gate.
-            if (matchzyTeam1.teamPlayers is not Newtonsoft.Json.Linq.JObject team1Players ||
-                matchzyTeam2.teamPlayers is not Newtonsoft.Json.Linq.JObject team2Players)
+            if (atTeam1.teamPlayers is not Newtonsoft.Json.Linq.JObject team1Players ||
+                atTeam2.teamPlayers is not Newtonsoft.Json.Linq.JObject team2Players)
             {
                 return true;
             }
@@ -2084,44 +2084,44 @@ namespace MatchZy
                 return;
             }
             // If default names, we pick a player and use their name as their team name
-            if (matchzyTeam1.teamName == "COUNTER-TERRORISTS")
+            if (atTeam1.teamName == "COUNTER-TERRORISTS")
             {
-                // matchzyTeam1.teamName = teamName;
-                teamSides[matchzyTeam1] = "CT";
-                reverseTeamSides["CT"] = matchzyTeam1;
+                // atTeam1.teamName = teamName;
+                teamSides[atTeam1] = "CT";
+                reverseTeamSides["CT"] = atTeam1;
                 foreach (var key in playerData.Keys)
                 {
                     if (playerData[key].TeamNum == 3)
                     {
-                        matchzyTeam1.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_"));
-                        foreach (var coach in matchzyTeam1.coach)
+                        atTeam1.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_"));
+                        foreach (var coach in atTeam1.coach)
                         {
-                            coach.Clan = $"[{matchzyTeam1.teamName} COACH]";
+                            coach.Clan = $"[{atTeam1.teamName} COACH]";
                         }
                         break;
                     }
                 }
-                // Server.ExecuteCommand($"mp_teamname_1 {matchzyTeam1.teamName}");
+                // Server.ExecuteCommand($"mp_teamname_1 {atTeam1.teamName}");
             }
 
-            if (matchzyTeam2.teamName == "TERRORISTS")
+            if (atTeam2.teamName == "TERRORISTS")
             {
-                // matchzyTeam2.teamName = teamName;
-                teamSides[matchzyTeam2] = "TERRORIST";
-                reverseTeamSides["TERRORIST"] = matchzyTeam2;
+                // atTeam2.teamName = teamName;
+                teamSides[atTeam2] = "TERRORIST";
+                reverseTeamSides["TERRORIST"] = atTeam2;
                 foreach (var key in playerData.Keys)
                 {
                     if (playerData[key].TeamNum == 2)
                     {
-                        matchzyTeam2.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_"));
-                        foreach (var coach in matchzyTeam2.coach)
+                        atTeam2.teamName = "team_" + RemoveSpecialCharacters(playerData[key].PlayerName.Replace(" ", "_"));
+                        foreach (var coach in atTeam2.coach)
                         {
-                            coach.Clan = $"[{matchzyTeam2.teamName} COACH]";
+                            coach.Clan = $"[{atTeam2.teamName} COACH]";
                         }
                         break;
                     }
                 }
-                // Server.ExecuteCommand($"mp_teamname_2 {matchzyTeam2.teamName}");
+                // Server.ExecuteCommand($"mp_teamname_2 {atTeam2.teamName}");
             }
 
             Server.ExecuteCommand($"mp_teamname_1 {reverseTeamSides["CT"].teamName}");
@@ -2131,7 +2131,7 @@ namespace MatchZy
 
             string seriesType = "BO" + matchConfig.NumMaps.ToString();
             CrashBreadcrumb($"HandleMatchStart: InitMatch begin (seriesType={seriesType})");
-            liveMatchId = database.InitMatch(matchzyTeam1.teamName, matchzyTeam2.teamName, "-", isMatchSetup, liveMatchId, matchConfig.CurrentMapNumber, seriesType, matchConfig);
+            liveMatchId = database.InitMatch(atTeam1.teamName, atTeam2.teamName, "-", isMatchSetup, liveMatchId, matchConfig.CurrentMapNumber, seriesType, matchConfig);
             CrashBreadcrumb($"HandleMatchStart: InitMatch done (liveMatchId={liveMatchId})");
             SetupRoundBackupFile();
 
@@ -2151,7 +2151,7 @@ namespace MatchZy
             }
             if (showCreditsOnMatchStart.Value)
             {
-                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}MatchZy{ChatColors.Default} Plugin by {ChatColors.Green}WD-{ChatColors.Default}");
+                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Auto Tournament CS2{ChatColors.Default} is forked from MatchZy by shobhit-pathak.");
             }
             if (matchStartMessage.Value.Trim() != "" && matchStartMessage.Value.Trim() != "\"\"")
             {
@@ -2251,8 +2251,8 @@ namespace MatchZy
 
             (string winnerName, string winnerSlot) = GetMatchWinner();
             (int t1score, int t2score) = GetTeamsScore();
-            int team1SeriesScore = matchzyTeam1.seriesScore;
-            int team2SeriesScore = matchzyTeam2.seriesScore;
+            int team1SeriesScore = atTeam1.seriesScore;
+            int team2SeriesScore = atTeam2.seriesScore;
 
             // High-signal checkpoint log so operators can see exactly what just happened
             // on this map and how it affects the overall series before any branching
@@ -2260,9 +2260,9 @@ namespace MatchZy
             string mapLabel = (currentMapNumber >= 0 && currentMapNumber < matchConfig.Maplist.Count)
                 ? matchConfig.Maplist[currentMapNumber]
                 : "unknown_map";
-            Log($"[SeriesCheckpoint] Map {currentMapNumber} ({mapLabel}) finished. Map score: {matchzyTeam1.teamName} {t1score} – {matchzyTeam2.teamName} {t2score}. Series score now: {matchzyTeam1.teamName} {team1SeriesScore} – {matchzyTeam2.teamName} {team2SeriesScore}.");
+            Log($"[SeriesCheckpoint] Map {currentMapNumber} ({mapLabel}) finished. Map score: {atTeam1.teamName} {t1score} – {atTeam2.teamName} {t2score}. Series score now: {atTeam1.teamName} {team1SeriesScore} – {atTeam2.teamName} {team2SeriesScore}.");
 
-            string statsPath = Server.GameDirectory + "/csgo/MatchZy_Stats/" + liveMatchId.ToString();
+            string statsPath = Server.GameDirectory + "/csgo/AutoTournamentCS2_Stats/" + liveMatchId.ToString();
 
             var mapResultEvent = new MapResultEvent
             {
@@ -2271,9 +2271,9 @@ namespace MatchZy
                 // Winner comes from the resolved map winner (score, then damage tiebreak),
                 // never from a raw score comparison: a tied map used to fall through to
                 // "team2" even when the tiebreak had picked team1.
-                Winner = new Winner(MatchLogic.SideNumberForSlot(winnerSlot, teamSides[matchzyTeam1]), winnerSlot),
-                StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, team1SeriesScore, t1score, 0, 0, new List<StatsPlayer>()),
-                StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, team2SeriesScore, t2score, 0, 0, new List<StatsPlayer>())
+                Winner = new Winner(MatchLogic.SideNumberForSlot(winnerSlot, teamSides[atTeam1]), winnerSlot),
+                StatsTeam1 = new AutoTournamentCS2StatsTeam(atTeam1.id, atTeam1.teamName, team1SeriesScore, t1score, 0, 0, new List<StatsPlayer>()),
+                StatsTeam2 = new AutoTournamentCS2StatsTeam(atTeam2.id, atTeam2.teamName, team2SeriesScore, t2score, 0, 0, new List<StatsPlayer>())
             };
 
             Task.Run(async () =>
@@ -2296,27 +2296,27 @@ namespace MatchZy
             // formula (NumMaps - series wins) ignored draws, so after a drawn map the
             // series never ended and the next line indexed past the map list.
             int remainingMaps = MatchLogic.RemainingMaps(matchConfig.NumMaps, matchConfig.Maplist.Count, currentMapNumber);
-            Log($"[HandleMatchEnd] MATCH ENDED, remainingMaps: {remainingMaps}, NumMaps: {matchConfig.NumMaps}, Team1SeriesScore: {matchzyTeam1.seriesScore}, Team2SeriesScore: {matchzyTeam2.seriesScore}");
-            if (MatchLogic.IsSeriesOver(matchConfig.NumMaps, remainingMaps, matchzyTeam1.seriesScore, matchzyTeam2.seriesScore, matchConfig.SeriesCanClinch))
+            Log($"[HandleMatchEnd] MATCH ENDED, remainingMaps: {remainingMaps}, NumMaps: {matchConfig.NumMaps}, Team1SeriesScore: {atTeam1.seriesScore}, Team2SeriesScore: {atTeam2.seriesScore}");
+            if (MatchLogic.IsSeriesOver(matchConfig.NumMaps, remainingMaps, atTeam1.seriesScore, atTeam2.seriesScore, matchConfig.SeriesCanClinch))
             {
                 // EndSeries picks the winner from the series score; a tied series score
                 // (only possible with draws allowed or an even map count) ends as a draw.
                 EndSeries(winnerName, restartDelay - 1, t1score, t2score);
                 return;
             }
-            if (matchzyTeam1.seriesScore > matchzyTeam2.seriesScore)
+            if (atTeam1.seriesScore > atTeam2.seriesScore)
             {
-                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam1.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}");
+                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{atTeam1.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{atTeam1.seriesScore}-{atTeam2.seriesScore}{ChatColors.Default}");
 
             }
-            else if (matchzyTeam2.seriesScore > matchzyTeam1.seriesScore)
+            else if (atTeam2.seriesScore > atTeam1.seriesScore)
             {
-                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam2.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{matchzyTeam2.seriesScore}-{matchzyTeam1.seriesScore}{ChatColors.Default}");
+                Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{atTeam2.teamName}{ChatColors.Default} is winning the series {ChatColors.Green}{atTeam2.seriesScore}-{atTeam1.seriesScore}{ChatColors.Default}");
 
             }
             else
             {
-                Server.PrintToChatAll($"{chatPrefix} The series is tied at {ChatColors.Green}{matchzyTeam1.seriesScore}-{matchzyTeam2.seriesScore}{ChatColors.Default}");
+                Server.PrintToChatAll($"{chatPrefix} The series is tied at {ChatColors.Green}{atTeam1.seriesScore}-{atTeam2.seriesScore}{ChatColors.Default}");
             }
             if (currentMapNumber + 1 >= matchConfig.Maplist.Count)
             {
@@ -2537,13 +2537,13 @@ namespace MatchZy
         {
             if (slot == MatchLogic.Team1)
             {
-                matchzyTeam1.seriesScore++;
-                return (matchzyTeam1.teamName, slot);
+                atTeam1.seriesScore++;
+                return (atTeam1.teamName, slot);
             }
             if (slot == MatchLogic.Team2)
             {
-                matchzyTeam2.seriesScore++;
-                return (matchzyTeam2.teamName, slot);
+                atTeam2.seriesScore++;
+                return (atTeam2.teamName, slot);
             }
             return ("Draw", MatchLogic.NoTeam);
         }
@@ -2570,12 +2570,12 @@ namespace MatchZy
                     if (!stats.TryGetValue("TeamName", out var teamNameObj)) continue;
                     string teamName = teamNameObj?.ToString() ?? string.Empty;
 
-                    if (teamName == matchzyTeam1.teamName)
+                    if (teamName == atTeam1.teamName)
                     {
                         d1 += Stat(stats, "Damage"); k1 += Stat(stats, "Kills");
                         h1 += Stat(stats, "HeadShotKills"); u1 += Stat(stats, "UtilityDamage");
                     }
-                    else if (teamName == matchzyTeam2.teamName)
+                    else if (teamName == atTeam2.teamName)
                     {
                         d2 += Stat(stats, "Damage"); k2 += Stat(stats, "Kills");
                         h2 += Stat(stats, "HeadShotKills"); u2 += Stat(stats, "UtilityDamage");
@@ -2588,7 +2588,7 @@ namespace MatchZy
             }
 
             Log($"[Tiebreak] Aggregate totals (damage/kills/headshot_kills/utility_damage) - " +
-                $"{matchzyTeam1.teamName}: {d1}/{k1}/{h1}/{u1}, {matchzyTeam2.teamName}: {d2}/{k2}/{h2}/{u2}");
+                $"{atTeam1.teamName}: {d1}/{k1}/{h1}/{u1}, {atTeam2.teamName}: {d2}/{k2}/{h2}/{u2}");
             return (new MatchLogic.TiebreakTotals(d1, k1, h1, u1), new MatchLogic.TiebreakTotals(d2, k2, h2, u2));
         }
 
@@ -2599,11 +2599,11 @@ namespace MatchZy
             int t2score = 0;
             foreach (var team in teamEntities)
             {
-                if (team.Teamname == teamSides[matchzyTeam1])
+                if (team.Teamname == teamSides[atTeam1])
                 {
                     t1score = team.Score;
                 }
-                else if (team.Teamname == teamSides[matchzyTeam2])
+                else if (team.Teamname == teamSides[atTeam2])
                 {
                     t2score = team.Score;
                 }
@@ -2624,7 +2624,7 @@ namespace MatchZy
             if (!matchStarted) return;
             playerHasTakenDamage = false;
             HandleCoaches();
-            CreateMatchZyRoundDataBackup();
+            CreateAutoTournamentCS2RoundDataBackup();
             InitPlayerDamageInfo();
             UpdateHostname();
             
@@ -2638,7 +2638,7 @@ namespace MatchZy
                 Log($"[HandlePostRoundStartEvent] Sending round_started event");
                 (int t1score, int t2score) = GetTeamsScore();
 
-                var roundStartedEvent = new MatchZyRoundStartedEvent
+                var roundStartedEvent = new AutoTournamentCS2RoundStartedEvent
                 {
                     MatchId = liveMatchId,
                     MapNumber = matchConfig.CurrentMapNumber,
@@ -2665,7 +2665,7 @@ namespace MatchZy
                     coachKillTimer?.Kill();
                     coachKillTimer = null;
                     (int t1score, int t2score) = GetTeamsScore();
-                    Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{matchzyTeam1.teamName} [{t1score} - {t2score}] {matchzyTeam2.teamName}");
+                    Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{atTeam1.teamName} [{t1score} - {t2score}] {atTeam2.teamName}");
 
                     ShowDamageInfo();
 
@@ -2675,10 +2675,10 @@ namespace MatchZy
                     long matchId = liveMatchId;
                     // The round winner is whichever team is on the winning side this round
                     // (sides swap after this event is built), not whoever leads the map.
-                    string roundWinnerSlot = MatchLogic.SlotForTeamNum(@event.Winner, teamSides[matchzyTeam1]) ?? MatchLogic.NoTeam;
+                    string roundWinnerSlot = MatchLogic.SlotForTeamNum(@event.Winner, teamSides[atTeam1]) ?? MatchLogic.NoTeam;
                     Winner winner = new(@event.Winner.ToString(), roundWinnerSlot);
 
-                    var roundEndEvent = new MatchZyRoundEndedEvent
+                    var roundEndEvent = new AutoTournamentCS2RoundEndedEvent
                     {
                         MatchId = liveMatchId,
                         MapNumber = matchConfig.CurrentMapNumber,
@@ -2686,8 +2686,8 @@ namespace MatchZy
                         Reason = @event.Reason,
                         RoundTime = 0,
                         Winner = winner,
-                        StatsTeam1 = new MatchZyStatsTeam(matchzyTeam1.id, matchzyTeam1.teamName, matchzyTeam1.seriesScore, t1score, 0, 0, playerStatsListTeam1),
-                        StatsTeam2 = new MatchZyStatsTeam(matchzyTeam2.id, matchzyTeam2.teamName, matchzyTeam2.seriesScore, t2score, 0, 0, playerStatsListTeam2),
+                        StatsTeam1 = new AutoTournamentCS2StatsTeam(atTeam1.id, atTeam1.teamName, atTeam1.seriesScore, t1score, 0, 0, playerStatsListTeam1),
+                        StatsTeam2 = new AutoTournamentCS2StatsTeam(atTeam2.id, atTeam2.teamName, atTeam2.seriesScore, t2score, 0, 0, playerStatsListTeam2),
                     };
 
                     Task.Run(async () =>
@@ -2698,9 +2698,9 @@ namespace MatchZy
                     });
 
                     string round = GetRoundNumer().ToString("D2");
-                    lastBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.txt";
-                    lastMatchZyBackupFileName = $"matchzy_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.json";
-                    Log($"[HandlePostRoundEndEvent] Setting lastBackupFileName to {lastBackupFileName} and lastMatchZyBackupFileName to {lastMatchZyBackupFileName}");
+                    lastBackupFileName = $"at_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.txt";
+                    lastAutoTournamentCS2BackupFileName = $"at_{liveMatchId}_{matchConfig.CurrentMapNumber}_round{round}.json";
+                    Log($"[HandlePostRoundEndEvent] Setting lastBackupFileName to {lastBackupFileName} and lastAutoTournamentCS2BackupFileName to {lastAutoTournamentCS2BackupFileName}");
 
                     // One of the team did not use .stop command hence display the proper message after the round has ended.
                     if (stopData["ct"] && !stopData["t"])
@@ -2770,30 +2770,30 @@ namespace MatchZy
             if (isMatchLive && isPaused)
             {
                 // ReplyToUserCommand(player, "Match is already paused!");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.paused"]);
+                ReplyToUserCommand(player, Localizer["at.utility.paused"]);
                 return;
             }
             if (IsHalfTimePhase())
             {
                 // ReplyToUserCommand(player, "You cannot use this command during halftime.");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.duringhalftime"]);
+                ReplyToUserCommand(player, Localizer["at.utility.duringhalftime"]);
                 return;
             }
             if (IsPostGamePhase())
             {
                 // ReplyToUserCommand(player, "You cannot use this command after the game has ended.");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.matchended"]);
+                ReplyToUserCommand(player, Localizer["at.utility.matchended"]);
                 return;
             }
             if (IsTacticalTimeoutActive())
             {
                 // ReplyToUserCommand(player, "You cannot use this command when tactical timeout is active.");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.tacticaltimeout"]);
+                ReplyToUserCommand(player, Localizer["at.utility.tacticaltimeout"]);
                 return;
             }
             if (!techPauseEnabled.Value && player != null)
             {
-                PrintToPlayerChat(player, Localizer["matchzy.pause.techpausenotenabled"]);
+                PrintToPlayerChat(player, Localizer["at.pause.techpausenotenabled"]);
                 return;
             }
             if (!string.IsNullOrEmpty(techPausePermission.Value) && techPausePermission.Value != "\"\"")
@@ -2839,17 +2839,17 @@ namespace MatchZy
                     
                     if (pausesUsed[pausingTeam] >= maxPausesPerTeam.Value)
                     {
-                        PrintToPlayerChat(player!, Localizer["matchzy.pause.nopausesleft", pauseTeamName, maxPausesPerTeam.Value]);
+                        PrintToPlayerChat(player!, Localizer["at.pause.nopausesleft", pauseTeamName, maxPausesPerTeam.Value]);
                         return;
                     }
                     
                     pausesUsed[pausingTeam]++;
                     int remaining = maxPausesPerTeam.Value - pausesUsed[pausingTeam];
-                    PrintToAllChat(Localizer["matchzy.pause.pausedthematchwithlimit", pauseTeamName, remaining]);
+                    PrintToAllChat(Localizer["at.pause.pausedthematchwithlimit", pauseTeamName, remaining]);
                 }
                 else
                 {
-                    PrintToAllChat(Localizer["matchzy.pause.pausedthematch", pauseTeamName]);
+                    PrintToAllChat(Localizer["at.pause.pausedthematch", pauseTeamName]);
                 }
                 // Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}{pauseTeamName}{ChatColors.Default} has paused the match. Type .unpause to unpause the match");
 
@@ -2862,7 +2862,7 @@ namespace MatchZy
                     {
                         if (isPaused)
                         {
-                            PrintToAllChat(Localizer["matchzy.pause.timeoutexpired"]);
+                            PrintToAllChat(Localizer["at.pause.timeoutexpired"]);
                             UnpauseMatch();
                         }
                     });
@@ -2883,7 +2883,7 @@ namespace MatchZy
 
                     var playerInfo = BuildPlayerInfo(player, pauseTeamName);
 
-                    var matchPausedEvent = new MatchZyMatchPausedEvent
+                    var matchPausedEvent = new AutoTournamentCS2MatchPausedEvent
                     {
                         MatchId = liveMatchId,
                         MapNumber = matchConfig.CurrentMapNumber,
@@ -2912,33 +2912,33 @@ namespace MatchZy
             if (isMatchLive && isPaused)
             {
                 // ReplyToUserCommand(player, "Match is already paused!");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.paused"]);
+                ReplyToUserCommand(player, Localizer["at.utility.paused"]);
                 return;
             }
             if (IsHalfTimePhase())
             {
                 // ReplyToUserCommand(player, "You cannot use this command during halftime.");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.duringhalftime"]);
+                ReplyToUserCommand(player, Localizer["at.utility.duringhalftime"]);
                 return;
             }
             if (IsPostGamePhase())
             {
                 // ReplyToUserCommand(player, "You cannot use this command after the game has ended.");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.matchended"]);
+                ReplyToUserCommand(player, Localizer["at.utility.matchended"]);
                 return;
             }
             if (IsTacticalTimeoutActive())
             {
                 // ReplyToUserCommand(player, "You cannot use this command when tactical timeout is active.");
-                ReplyToUserCommand(player, Localizer["matchzy.utility.tacticaltimeout"]);
+                ReplyToUserCommand(player, Localizer["at.utility.tacticaltimeout"]);
                 return;
             }
             unpauseData["pauseTeam"] = "Admin";
-            PrintToAllChat(Localizer["matchzy.pause.adminpausedthematch"]);
+            PrintToAllChat(Localizer["at.pause.adminpausedthematch"]);
             // Server.PrintToChatAll($"{chatPrefix} {ChatColors.Green}Admin{ChatColors.Default} has paused the match.");
             if (player == null)
             {
-                Server.PrintToConsole($"[MatchZy] {Localizer["matchzy.pause.adminpausedthematch"]}");
+                Server.PrintToConsole($"[Auto Tournament] {Localizer["at.pause.adminpausedthematch"]}");
             }
             
             // Note: CS2's built-in pause system shows "MATCH PAUSED" overlay, so we don't show additional center HTML
@@ -2949,17 +2949,17 @@ namespace MatchZy
             // Send match_paused event for admin pause
             Log($"[ForcePauseMatch] Sending match_paused event - admin pause");
 
-            MatchZyPlayerInfo adminPlayerInfo;
+            AutoTournamentCS2PlayerInfo adminPlayerInfo;
             if (player != null)
             {
                 adminPlayerInfo = BuildPlayerInfo(player, "Admin");
             }
             else
             {
-                adminPlayerInfo = new MatchZyPlayerInfo("Console", "Admin", "Admin");
+                adminPlayerInfo = new AutoTournamentCS2PlayerInfo("Console", "Admin", "Admin");
             }
 
-            var matchPausedEvent = new MatchZyMatchPausedEvent
+            var matchPausedEvent = new AutoTournamentCS2MatchPausedEvent
             {
                 MatchId = liveMatchId,
                 MapNumber = matchConfig.CurrentMapNumber,
@@ -2984,12 +2984,12 @@ namespace MatchZy
                     SendPlayerNotAdminMessage(player);
                     return;
                 }
-                PrintToAllChat(Localizer["matchzy.pause.adminunpausedthematch"]);
+                PrintToAllChat(Localizer["at.pause.adminunpausedthematch"]);
                 UnpauseMatch();
 
                 if (player == null)
                 {
-                    Server.PrintToConsole("[MatchZy] Admin has unpaused the match, resuming the match!");
+                    Server.PrintToConsole("[Auto Tournament] Admin has unpaused the match, resuming the match!");
                 }
             }
         }
@@ -3030,7 +3030,7 @@ namespace MatchZy
                 // Send match_unpaused event
                 Log($"[UnpauseMatch] Sending match_unpaused event - pause duration: {pauseDuration}s");
 
-                var matchUnpausedEvent = new MatchZyMatchUnpausedEvent
+                var matchUnpausedEvent = new AutoTournamentCS2MatchUnpausedEvent
                 {
                     MatchId = liveMatchId,
                     MapNumber = matchConfig.CurrentMapNumber,
@@ -3108,7 +3108,7 @@ namespace MatchZy
             
             string teamName = teamNum == 2 ? reverseTeamSides["TERRORIST"].teamName : reverseTeamSides["CT"].teamName;
             Log($"[FFW] Starting FFW timer for teamNum={teamNum} (teamName={teamName}), duration={ffwRemainingSeconds}s");
-            PrintToAllChat(Localizer["matchzy.ffw.started", teamName, ffwRemainingSeconds / 60]);
+            PrintToAllChat(Localizer["at.ffw.started", teamName, ffwRemainingSeconds / 60]);
             
             // Create timer that fires at configured interval
             float checkInterval = ffwCheckInterval.Value;
@@ -3124,7 +3124,7 @@ namespace MatchZy
                 else
                 {
                     // Show remaining time in seconds
-                    PrintToAllChat(Localizer["matchzy.ffw.warning", teamName, ffwRemainingSeconds]);
+                    PrintToAllChat(Localizer["at.ffw.warning", teamName, ffwRemainingSeconds]);
                 }
             }, TimerFlags.REPEAT);
         }
@@ -3135,7 +3135,7 @@ namespace MatchZy
             
             string teamName = ffwTeamMissing == 2 ? reverseTeamSides["TERRORIST"].teamName : reverseTeamSides["CT"].teamName;
             Log($"[FFW] Cancelling FFW timer for teamName={teamName}, remainingSeconds={ffwRemainingSeconds}");
-            PrintToAllChat(Localizer["matchzy.ffw.cancelled", teamName]);
+            PrintToAllChat(Localizer["at.ffw.cancelled", teamName]);
             
             ffwTimer.Kill();
             ffwTimer = null;
@@ -3151,7 +3151,7 @@ namespace MatchZy
             string winningTeamName = ffwTeamMissing == 2 ? reverseTeamSides["CT"].teamName : reverseTeamSides["TERRORIST"].teamName;
             
             Log($"[FFW] Executing forfeit - missingTeam={missingTeamName}, winningTeam={winningTeamName}, ffwRemainingSeconds={ffwRemainingSeconds}");
-            PrintToAllChat(Localizer["matchzy.ffw.executed", missingTeamName, winningTeamName]);
+            PrintToAllChat(Localizer["at.ffw.executed", missingTeamName, winningTeamName]);
             
             // Award win to the team that stayed by setting scores
             var teamEntities = Utilities.FindAllEntitiesByDesignerName<CCSTeam>("cs_team_manager");
@@ -3238,7 +3238,7 @@ namespace MatchZy
         private void SendPlayerNotAdminMessage(CCSPlayerController? player)
         {
             // ReplyToUserCommand(player, "You do not have permission to use this command!");
-            ReplyToUserCommand(player, Localizer["matchzy.utility.dontpermission"]);
+            ReplyToUserCommand(player, Localizer["at.utility.dontpermission"]);
         }
 
         private string GetColorTreatedString(string message)
@@ -3300,7 +3300,7 @@ namespace MatchZy
         public void LoadClientNames()
         {
             string namesFileName = "Match_" + liveMatchId.ToString() + ".ini";
-            string namesFilePath = Server.GameDirectory + "/csgo/MatchZyPlayerNames/" + namesFileName;
+            string namesFilePath = Server.GameDirectory + "/csgo/AutoTournamentCS2PlayerNames/" + namesFileName;
             string? directoryPath = Path.GetDirectoryName(namesFilePath);
             if (directoryPath != null)
             {
@@ -3314,13 +3314,13 @@ namespace MatchZy
             sb.AppendLine("\"Names\"");
             sb.AppendLine("{");
 
-            WriteClientNamesInFile(sb, matchzyTeam1.teamPlayers);
-            WriteClientNamesInFile(sb, matchzyTeam2.teamPlayers);
+            WriteClientNamesInFile(sb, atTeam1.teamPlayers);
+            WriteClientNamesInFile(sb, atTeam2.teamPlayers);
             WriteClientNamesInFile(sb, matchConfig.Spectators);
 
             sb.AppendLine("}");
             File.WriteAllText(namesFilePath, sb.ToString());
-            Server.ExecuteCommand($"sv_load_forced_client_names_file MatchZyPlayerNames/" + namesFileName);
+            Server.ExecuteCommand($"sv_load_forced_client_names_file AutoTournamentCS2PlayerNames/" + namesFileName);
         }
 
         public void WriteClientNamesInFile(StringBuilder sb, JToken? players)
@@ -3471,8 +3471,8 @@ namespace MatchZy
                 .Replace("{MATCH_ID}", $"{liveMatchId}")
                 .Replace("{MAP}", Server.MapName)
                 .Replace("{MAPNUMBER}", matchConfig.CurrentMapNumber.ToString())
-                .Replace("{TEAM1}", matchzyTeam1.teamName.Replace(" ", "_"))
-                .Replace("{TEAM2}", matchzyTeam2.teamName.Replace(" ", "_"))
+                .Replace("{TEAM1}", atTeam1.teamName.Replace(" ", "_"))
+                .Replace("{TEAM2}", atTeam2.teamName.Replace(" ", "_"))
                 .Replace("{TEAM1_SCORE}", team1Score.ToString())
                 .Replace("{TEAM2_SCORE}", team2Score.ToString());
             return formattedValue;
@@ -3676,8 +3676,8 @@ namespace MatchZy
                         Stats = playerStatsInstance
                     };
 
-                    int ctTeamNum = reverseTeamSides["CT"] == matchzyTeam1 ? 1 : 2;
-                    int tTeamNum = reverseTeamSides["TERRORIST"] == matchzyTeam1 ? 1 : 2;
+                    int ctTeamNum = reverseTeamSides["CT"] == atTeam1 ? 1 : 2;
+                    int tTeamNum = reverseTeamSides["TERRORIST"] == atTeam1 ? 1 : 2;
 
                     if (player.TeamNum == 3)
                     {
@@ -3720,7 +3720,7 @@ namespace MatchZy
         private string? lastLoggedConfigScope;
 
         /// <summary>
-        /// Resolves the identity that scopes this server's rows in the MatchZy database.
+        /// Resolves the identity that scopes this server's rows in the Auto Tournament CS2 database.
         ///
         /// Invoked lazily by Database on the first config read or write, and again on later
         /// accesses only while the result is provisional (see ScopeResolution.IsFinal). It cannot
@@ -3809,8 +3809,8 @@ namespace MatchZy
                 {
                     string warning =
                         $"[ConfigScope] WARNING: could not identify this server for its persistent config. " +
-                        $"Neither +matchzy_config_scope nor a game port was found (install path: '{installPath ?? "unknown"}'). " +
-                        $"Add '+matchzy_config_scope <name>' to this server's start arguments so its config survives restarts and moves.";
+                        $"Neither +at_config_scope nor a game port was found (install path: '{installPath ?? "unknown"}'). " +
+                        $"Add '+at_config_scope <name>' to this server's start arguments so its config survives restarts and moves.";
                     Log(warning);
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine(warning);
@@ -3832,185 +3832,185 @@ namespace MatchZy
                 Log("[LoadPersistentConfig] Loading persistent configuration from database...");
                 
                 // Load remote log URL
-                var remoteLogUrl = database.LoadConfigValue("matchzy_remote_log_url");
+                var remoteLogUrl = database.LoadConfigValue("at_remote_log_url");
                 if (!string.IsNullOrEmpty(remoteLogUrl))
                 {
                     matchConfig.RemoteLogURL = remoteLogUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_remote_log_url: {SecretRedactor.FormatValue("matchzy_remote_log_url", remoteLogUrl)}");
+                    Log($"[LoadPersistentConfig] Loaded at_remote_log_url: {SecretRedactor.FormatValue("at_remote_log_url", remoteLogUrl)}");
                 }
                 
                 // Load remote log header key
-                var remoteLogHeaderKey = database.LoadConfigValue("matchzy_remote_log_header_key");
+                var remoteLogHeaderKey = database.LoadConfigValue("at_remote_log_header_key");
                 if (!string.IsNullOrEmpty(remoteLogHeaderKey))
                 {
                     matchConfig.RemoteLogHeaderKey = remoteLogHeaderKey;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_remote_log_header_key: {remoteLogHeaderKey}");
+                    Log($"[LoadPersistentConfig] Loaded at_remote_log_header_key: {remoteLogHeaderKey}");
                 }
                 
                 // Load remote log header value
-                var remoteLogHeaderValue = database.LoadConfigValue("matchzy_remote_log_header_value");
+                var remoteLogHeaderValue = database.LoadConfigValue("at_remote_log_header_value");
                 if (!string.IsNullOrEmpty(remoteLogHeaderValue))
                 {
                     matchConfig.RemoteLogHeaderValue = remoteLogHeaderValue;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_remote_log_header_value {SecretRedactor.Hidden(remoteLogHeaderValue)}");
+                    Log($"[LoadPersistentConfig] Loaded at_remote_log_header_value {SecretRedactor.Hidden(remoteLogHeaderValue)}");
                 }
                 
                 // Load demo upload URL
-                var demoUploadUrl = database.LoadConfigValue("matchzy_demo_upload_url");
+                var demoUploadUrl = database.LoadConfigValue("at_demo_upload_url");
                 if (!string.IsNullOrEmpty(demoUploadUrl))
                 {
                     demoUploadURL = demoUploadUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_demo_upload_url: {SecretRedactor.FormatValue("matchzy_demo_upload_url", demoUploadUrl)}");
+                    Log($"[LoadPersistentConfig] Loaded at_demo_upload_url: {SecretRedactor.FormatValue("at_demo_upload_url", demoUploadUrl)}");
                 }
                 
                 // Load chat prefix
-                var chatPrefix = database.LoadConfigValue("matchzy_chat_prefix");
+                var chatPrefix = database.LoadConfigValue("at_chat_prefix");
                 if (!string.IsNullOrEmpty(chatPrefix))
                 {
                     this.chatPrefix = chatPrefix;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_chat_prefix: {chatPrefix}");
+                    Log($"[LoadPersistentConfig] Loaded at_chat_prefix: {chatPrefix}");
                 }
                 
                 // Load admin chat prefix
-                var adminChatPrefix = database.LoadConfigValue("matchzy_admin_chat_prefix");
+                var adminChatPrefix = database.LoadConfigValue("at_admin_chat_prefix");
                 if (!string.IsNullOrEmpty(adminChatPrefix))
                 {
                     this.adminChatPrefix = adminChatPrefix;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_admin_chat_prefix: {adminChatPrefix}");
+                    Log($"[LoadPersistentConfig] Loaded at_admin_chat_prefix: {adminChatPrefix}");
                 }
                 
                 // Load server ID
-                var serverId = database.LoadConfigValue("matchzy_server_id");
+                var serverId = database.LoadConfigValue("at_server_id");
                 if (!string.IsNullOrEmpty(serverId))
                 {
                     matchReportServerId.Value = serverId;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_server_id: {serverId}");
+                    Log($"[LoadPersistentConfig] Loaded at_server_id: {serverId}");
                 }
 
                 // Load bootstrap URL/token (server pull-based initialization)
-                var bootstrapUrl = database.LoadConfigValue("matchzy_bootstrap_url");
+                var bootstrapUrl = database.LoadConfigValue("at_bootstrap_url");
                 if (!string.IsNullOrEmpty(bootstrapUrl))
                 {
                     this.bootstrapUrl = bootstrapUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_bootstrap_url: {SecretRedactor.FormatValue("matchzy_bootstrap_url", bootstrapUrl)}");
+                    Log($"[LoadPersistentConfig] Loaded at_bootstrap_url: {SecretRedactor.FormatValue("at_bootstrap_url", bootstrapUrl)}");
                 }
 
-                var bootstrapToken = database.LoadConfigValue("matchzy_bootstrap_token");
+                var bootstrapToken = database.LoadConfigValue("at_bootstrap_token");
                 if (!string.IsNullOrEmpty(bootstrapToken))
                 {
                     this.bootstrapToken = bootstrapToken;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_bootstrap_token {SecretRedactor.Hidden(bootstrapToken)}");
+                    Log($"[LoadPersistentConfig] Loaded at_bootstrap_token {SecretRedactor.Hidden(bootstrapToken)}");
                 }
 
                 // Load MAT heartbeat integration settings
-                var heartbeatUrl = database.LoadConfigValue("matchzy_heartbeat_url");
+                var heartbeatUrl = database.LoadConfigValue("at_heartbeat_url");
                 if (!string.IsNullOrEmpty(heartbeatUrl))
                 {
                     this.heartbeatUrl = heartbeatUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_heartbeat_url: {SecretRedactor.FormatValue("matchzy_heartbeat_url", heartbeatUrl)}");
+                    Log($"[LoadPersistentConfig] Loaded at_heartbeat_url: {SecretRedactor.FormatValue("at_heartbeat_url", heartbeatUrl)}");
                 }
 
-                var matchToken = database.LoadConfigValue("matchzy_match_token");
+                var matchToken = database.LoadConfigValue("at_match_token");
                 if (!string.IsNullOrEmpty(matchToken))
                 {
                     this.matchToken = matchToken;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_match_token {SecretRedactor.Hidden(matchToken)}");
+                    Log($"[LoadPersistentConfig] Loaded at_match_token {SecretRedactor.Hidden(matchToken)}");
                 }
 
-                var webhookUrl = database.LoadConfigValue("matchzy_webhook_url");
+                var webhookUrl = database.LoadConfigValue("at_webhook_url");
                 if (!string.IsNullOrEmpty(webhookUrl))
                 {
                     this.webhookUrl = webhookUrl;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_webhook_url: {SecretRedactor.FormatValue("matchzy_webhook_url", webhookUrl)}");
+                    Log($"[LoadPersistentConfig] Loaded at_webhook_url: {SecretRedactor.FormatValue("at_webhook_url", webhookUrl)}");
                 }
 
                 // Load report endpoint if it was persisted by a controller
-                var reportEndpoint = database.LoadConfigValue("matchzy_report_endpoint");
+                var reportEndpoint = database.LoadConfigValue("at_report_endpoint");
                 if (!string.IsNullOrEmpty(reportEndpoint))
                 {
                     matchReportEndpoint.Value = reportEndpoint;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_report_endpoint: {SecretRedactor.FormatValue("matchzy_report_endpoint", reportEndpoint)}");
+                    Log($"[LoadPersistentConfig] Loaded at_report_endpoint: {SecretRedactor.FormatValue("at_report_endpoint", reportEndpoint)}");
                 }
 
                 // Load report token if it was persisted by a controller
-                var reportToken = database.LoadConfigValue("matchzy_report_token");
+                var reportToken = database.LoadConfigValue("at_report_token");
                 if (!string.IsNullOrEmpty(reportToken))
                 {
                     matchReportToken.Value = reportToken;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_report_token {SecretRedactor.Hidden(reportToken)}");
+                    Log($"[LoadPersistentConfig] Loaded at_report_token {SecretRedactor.Hidden(reportToken)}");
                 }
 
                 // Load optional MAT admin list integration settings
-                var adminsUrl = database.LoadConfigValue("matchzy_admins_url");
+                var adminsUrl = database.LoadConfigValue("at_admins_url");
                 if (!string.IsNullOrEmpty(adminsUrl))
                 {
-                    matchzyAdminsUrl = adminsUrl.Trim();
-                    Log($"[LoadPersistentConfig] Loaded matchzy_admins_url: {SecretRedactor.FormatValue("matchzy_admins_url", matchzyAdminsUrl)}");
+                    atAdminsUrl = adminsUrl.Trim();
+                    Log($"[LoadPersistentConfig] Loaded at_admins_url: {SecretRedactor.FormatValue("at_admins_url", atAdminsUrl)}");
                 }
 
-                var adminsRefreshSecondsRaw = database.LoadConfigValue("matchzy_admins_refresh_seconds");
+                var adminsRefreshSecondsRaw = database.LoadConfigValue("at_admins_refresh_seconds");
                 if (!string.IsNullOrEmpty(adminsRefreshSecondsRaw) &&
                     int.TryParse(adminsRefreshSecondsRaw.Trim(), out var secs) &&
                     secs >= 0)
                 {
-                    matchzyAdminsRefreshSeconds = secs;
-                    Log($"[LoadPersistentConfig] Loaded matchzy_admins_refresh_seconds: {matchzyAdminsRefreshSeconds}");
+                    atAdminsRefreshSeconds = secs;
+                    Log($"[LoadPersistentConfig] Loaded at_admins_refresh_seconds: {atAdminsRefreshSeconds}");
                 }
 
                 // Load server-level warmup settings (idle-only controls)
-                var warmupEnableRaw = database.LoadConfigValue("matchzy_warmup_enable");
+                var warmupEnableRaw = database.LoadConfigValue("at_warmup_enable");
                 if (!string.IsNullOrEmpty(warmupEnableRaw))
                 {
-                    matchzyWarmupEnabled = warmupEnableRaw.Trim() != "0";
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_enable: {(matchzyWarmupEnabled ? 1 : 0)}");
+                    atWarmupEnabled = warmupEnableRaw.Trim() != "0";
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_enable: {(atWarmupEnabled ? 1 : 0)}");
                 }
-                var warmupHtml = database.LoadConfigValue("matchzy_warmup_message_html");
+                var warmupHtml = database.LoadConfigValue("at_warmup_message_html");
                 if (!string.IsNullOrEmpty(warmupHtml))
                 {
-                    matchzyWarmupMessageHtml = warmupHtml;
-                    Log("[LoadPersistentConfig] Loaded matchzy_warmup_message_html (hidden)");
+                    atWarmupMessageHtml = warmupHtml;
+                    Log("[LoadPersistentConfig] Loaded at_warmup_message_html (hidden)");
                 }
-                var warmupRespawnRaw = database.LoadConfigValue("matchzy_warmup_respawn");
+                var warmupRespawnRaw = database.LoadConfigValue("at_warmup_respawn");
                 if (!string.IsNullOrEmpty(warmupRespawnRaw))
                 {
-                    matchzyWarmupRespawn = warmupRespawnRaw.Trim() != "0";
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_respawn: {(matchzyWarmupRespawn ? 1 : 0)}");
+                    atWarmupRespawn = warmupRespawnRaw.Trim() != "0";
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_respawn: {(atWarmupRespawn ? 1 : 0)}");
                 }
-                var warmupIgnoreRaw = database.LoadConfigValue("matchzy_warmup_ignore_win_conditions");
+                var warmupIgnoreRaw = database.LoadConfigValue("at_warmup_ignore_win_conditions");
                 if (!string.IsNullOrEmpty(warmupIgnoreRaw))
                 {
-                    matchzyWarmupIgnoreWinConditions = warmupIgnoreRaw.Trim() != "0";
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_ignore_win_conditions: {(matchzyWarmupIgnoreWinConditions ? 1 : 0)}");
+                    atWarmupIgnoreWinConditions = warmupIgnoreRaw.Trim() != "0";
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_ignore_win_conditions: {(atWarmupIgnoreWinConditions ? 1 : 0)}");
                 }
-                var warmupRoundtimeRaw = database.LoadConfigValue("matchzy_warmup_roundtime_minutes");
+                var warmupRoundtimeRaw = database.LoadConfigValue("at_warmup_roundtime_minutes");
                 if (!string.IsNullOrEmpty(warmupRoundtimeRaw) && float.TryParse(warmupRoundtimeRaw.Trim(), out var rt))
                 {
-                    matchzyWarmupRoundtimeMinutes = Math.Clamp(rt, 1.0f, 120.0f);
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_roundtime_minutes: {matchzyWarmupRoundtimeMinutes}");
+                    atWarmupRoundtimeMinutes = Math.Clamp(rt, 1.0f, 120.0f);
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_roundtime_minutes: {atWarmupRoundtimeMinutes}");
                 }
-                var warmupStartMoneyRaw = database.LoadConfigValue("matchzy_warmup_startmoney");
+                var warmupStartMoneyRaw = database.LoadConfigValue("at_warmup_startmoney");
                 if (!string.IsNullOrEmpty(warmupStartMoneyRaw) && int.TryParse(warmupStartMoneyRaw.Trim(), out var sm))
                 {
-                    matchzyWarmupStartmoney = Math.Clamp(sm, 0, 60000);
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_startmoney: {matchzyWarmupStartmoney}");
+                    atWarmupStartmoney = Math.Clamp(sm, 0, 60000);
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_startmoney: {atWarmupStartmoney}");
                 }
-                var warmupMaxMoneyRaw = database.LoadConfigValue("matchzy_warmup_maxmoney");
+                var warmupMaxMoneyRaw = database.LoadConfigValue("at_warmup_maxmoney");
                 if (!string.IsNullOrEmpty(warmupMaxMoneyRaw) && int.TryParse(warmupMaxMoneyRaw.Trim(), out var mm))
                 {
-                    matchzyWarmupMaxmoney = Math.Clamp(mm, 0, 60000);
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_maxmoney: {matchzyWarmupMaxmoney}");
+                    atWarmupMaxmoney = Math.Clamp(mm, 0, 60000);
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_maxmoney: {atWarmupMaxmoney}");
                 }
-                var warmupBuyRaw = database.LoadConfigValue("matchzy_warmup_buy_anywhere");
+                var warmupBuyRaw = database.LoadConfigValue("at_warmup_buy_anywhere");
                 if (!string.IsNullOrEmpty(warmupBuyRaw))
                 {
-                    matchzyWarmupBuyAnywhere = warmupBuyRaw.Trim() != "0";
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_buy_anywhere: {(matchzyWarmupBuyAnywhere ? 1 : 0)}");
+                    atWarmupBuyAnywhere = warmupBuyRaw.Trim() != "0";
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_buy_anywhere: {(atWarmupBuyAnywhere ? 1 : 0)}");
                 }
-                var warmupInfAmmoRaw = database.LoadConfigValue("matchzy_warmup_infinite_ammo");
+                var warmupInfAmmoRaw = database.LoadConfigValue("at_warmup_infinite_ammo");
                 if (!string.IsNullOrEmpty(warmupInfAmmoRaw))
                 {
-                    matchzyWarmupInfiniteAmmo = warmupInfAmmoRaw.Trim() != "0";
-                    Log($"[LoadPersistentConfig] Loaded matchzy_warmup_infinite_ammo: {(matchzyWarmupInfiniteAmmo ? 1 : 0)}");
+                    atWarmupInfiniteAmmo = warmupInfAmmoRaw.Trim() != "0";
+                    Log($"[LoadPersistentConfig] Loaded at_warmup_infinite_ammo: {(atWarmupInfiniteAmmo ? 1 : 0)}");
                 }
                 
                 Log("[LoadPersistentConfig] Persistent configuration loaded successfully.");
@@ -4018,8 +4018,8 @@ namespace MatchZy
                 // Start admin refresh polling if configured.
                 Server.NextFrame(() =>
                 {
-                    StartMatchzyAdminsRefreshTimerIfConfigured("persistent_config");
-                    ApplyMatchzyWarmupSettings("persistent_config");
+                    StartAutoTournamentCS2AdminsRefreshTimerIfConfigured("persistent_config");
+                    ApplyAutoTournamentCS2WarmupSettings("persistent_config");
                 });
             }
             catch (Exception ex)
@@ -4044,7 +4044,7 @@ namespace MatchZy
                 // Ignore and continue to log to console.
             }
 
-            Console.WriteLine("[MatchZy] " + message);
+            Console.WriteLine("[Auto Tournament] " + message);
         }
 
         private void AutoStart()
@@ -4113,7 +4113,7 @@ namespace MatchZy
                 return;
 
             // In simulation mode, bots represent configured players and must not be removed
-            // by generic MatchZy logic. For regular matches, bots can still be kicked.
+            // by generic Auto Tournament CS2 logic. For regular matches, bots can still be kicked.
             if (isSimulationMode && player.IsBot)
             {
                 Log($"[KickPlayer] SKIP kick for bot '{player.PlayerName}' (UserId={player.UserId}) because simulation mode is active.");
@@ -4219,7 +4219,7 @@ namespace MatchZy
                 {
                     FileInfo fileInfo = new FileInfo(filePath);
                     Log($"[UploadFileAsync] Demo file exists locally at: {filePath} (Size: {fileInfo.Length / 1024 / 1024} MB)");
-                    Log($"[UploadFileAsync] To enable upload, set matchzy_demo_upload_url in your config.");
+                    Log($"[UploadFileAsync] To enable upload, set at_demo_upload_url in your config.");
                 }
                 Log($"[DEMO_UPLOAD] SKIPPED matchId={matchId} map={mapNumber} reason=\"missing_filePath_or_uploadUrl\"");
                 return;
@@ -4272,7 +4272,7 @@ namespace MatchZy
                     {
                         try
                         {
-                            await SendEventAsync(new MatchZyDemoUploadFailEvent
+                            await SendEventAsync(new AutoTournamentCS2DemoUploadFailEvent
                             {
                                 MatchId = matchId,
                                 MapNumber = mapNumber,
@@ -4281,7 +4281,7 @@ namespace MatchZy
                                 Status = "file_not_found",
                                 Reason = "file_not_found"
                             });
-                            await SendEventAsync(new MatchZyDemoUploadedEvent
+                            await SendEventAsync(new AutoTournamentCS2DemoUploadedEvent
                             {
                                 MatchId = matchId,
                                 MapNumber = mapNumber,
@@ -4305,7 +4305,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        await SendEventAsync(new MatchZyDemoUploadStartedEvent
+                        await SendEventAsync(new AutoTournamentCS2DemoUploadStartedEvent
                         {
                             MatchId = matchId,
                             MapNumber = mapNumber,
@@ -4321,10 +4321,10 @@ namespace MatchZy
                 content.Headers.Add("Content-Type", "application/octet-stream");
 
                 string fileName = Path.GetFileName(filePath);
-                content.Headers.Add("MatchZy-FileName", fileName);
-                content.Headers.Add("MatchZy-MatchId", matchId.ToString());
-                content.Headers.Add("MatchZy-MapNumber", mapNumber.ToString());
-                content.Headers.Add("MatchZy-RoundNumber", roundNumber.ToString());
+                content.Headers.Add("Auto-Tournament-FileName", fileName);
+                content.Headers.Add("Auto-Tournament-MatchId", matchId.ToString());
+                content.Headers.Add("Auto-Tournament-MapNumber", mapNumber.ToString());
+                content.Headers.Add("Auto-Tournament-RoundNumber", roundNumber.ToString());
 
                 // For Get5 Panel
                 content.Headers.Add("Get5-FileName", fileName);
@@ -4333,10 +4333,10 @@ namespace MatchZy
                 content.Headers.Add("Get5-RoundNumber", roundNumber.ToString());
 
                 Log($"[UploadFileAsync] HTTP Headers:");
-                Log($"[UploadFileAsync]   - MatchZy-FileName: {fileName}");
-                Log($"[UploadFileAsync]   - MatchZy-MatchId: {matchId}");
-                Log($"[UploadFileAsync]   - MatchZy-MapNumber: {mapNumber}");
-                Log($"[UploadFileAsync]   - MatchZy-RoundNumber: {roundNumber}");
+                Log($"[UploadFileAsync]   - Auto-Tournament-FileName: {fileName}");
+                Log($"[UploadFileAsync]   - Auto-Tournament-MatchId: {matchId}");
+                Log($"[UploadFileAsync]   - Auto-Tournament-MapNumber: {mapNumber}");
+                Log($"[UploadFileAsync]   - Auto-Tournament-RoundNumber: {roundNumber}");
 
                 if (!string.IsNullOrEmpty(headerKey) && !string.IsNullOrEmpty(headerValue))
                 {
@@ -4397,7 +4397,7 @@ namespace MatchZy
                     {
                         try
                         {
-                            await SendEventAsync(new MatchZyDemoUploadSuccessEvent
+                            await SendEventAsync(new AutoTournamentCS2DemoUploadSuccessEvent
                             {
                                 MatchId = matchId,
                                 MapNumber = mapNumber,
@@ -4405,7 +4405,7 @@ namespace MatchZy
                                 SizeMB = fileSizeMB,
                                 Status = ((int)response.StatusCode).ToString()
                             });
-                            await SendEventAsync(new MatchZyDemoUploadedEvent
+                            await SendEventAsync(new AutoTournamentCS2DemoUploadedEvent
                             {
                                 MatchId = matchId,
                                 MapNumber = mapNumber,
@@ -4442,7 +4442,7 @@ namespace MatchZy
                     {
                         try
                         {
-                            await SendEventAsync(new MatchZyDemoUploadFailEvent
+                            await SendEventAsync(new AutoTournamentCS2DemoUploadFailEvent
                             {
                                 MatchId = matchId,
                                 MapNumber = mapNumber,
@@ -4451,7 +4451,7 @@ namespace MatchZy
                                 Status = ((int)response.StatusCode).ToString(),
                                 Reason = errorReason
                             });
-                            await SendEventAsync(new MatchZyDemoUploadedEvent
+                            await SendEventAsync(new AutoTournamentCS2DemoUploadedEvent
                             {
                                 MatchId = matchId,
                                 MapNumber = mapNumber,
@@ -4492,7 +4492,7 @@ namespace MatchZy
                 {
                     try
                     {
-                        await SendEventAsync(new MatchZyDemoUploadFailEvent
+                        await SendEventAsync(new AutoTournamentCS2DemoUploadFailEvent
                         {
                             MatchId = matchId,
                             MapNumber = mapNumber,
@@ -4501,7 +4501,7 @@ namespace MatchZy
                             Status = "exception",
                             Reason = errorMessage
                         });
-                        await SendEventAsync(new MatchZyDemoUploadedEvent
+                        await SendEventAsync(new AutoTournamentCS2DemoUploadedEvent
                         {
                             MatchId = matchId,
                             MapNumber = mapNumber,
@@ -4522,14 +4522,14 @@ namespace MatchZy
 
         public bool HandlePlayerWhitelist(CCSPlayerController player, string steamId)
         {
-            // Always allow admins to bypass the MatchZy whitelist; they may join to observe
+            // Always allow admins to bypass the Auto Tournament CS2 whitelist; they may join to observe
             // or administrate matches without needing a separate whitelist entry.
             if (IsPlayerAdmin(player))
             {
                 return false;
             }
 
-            string whitelistfileName = "MatchZy/whitelist.cfg";
+            string whitelistfileName = "AutoTournamentCS2/whitelist.cfg";
             string whitelistPath = Path.Join(Server.GameDirectory + "/csgo/cfg", whitelistfileName);
             string? directoryPath = Path.GetDirectoryName(whitelistPath);
             if (directoryPath != null)

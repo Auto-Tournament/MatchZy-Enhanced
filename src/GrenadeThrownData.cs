@@ -2,7 +2,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 public class GrenadeThrownData
 {
     public Vector Position { get; private set; }
@@ -101,7 +101,7 @@ public class GrenadeThrownData
 				break;
 			}
 			default:
-				Console.WriteLine($"[MatchZy] Unknown Grenade: {Type}");
+				Console.WriteLine($"[Auto Tournament] Unknown Grenade: {Type}");
 				break;
 		}
 

@@ -34,4 +34,4 @@ jobs:
       # Unit tests cover the dependency-free match rules in src/MatchLogic.cs
       # (map/round winner resolution, side<->team mapping, timescale clamp).
       - name: Test
-        run: dotnet test tests/MatchZy.Tests -c Release --nologo
+        run: dotnet test tests/AutoTournamentCS2.Tests -c Release --nologo

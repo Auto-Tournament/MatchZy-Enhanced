@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 public enum MapChangeKind
 {
@@ -16,7 +16,7 @@ public enum MapChangeKind
 
 /// <summary>
 /// Pure map-change rules with no CounterStrikeSharp dependency, so they can be unit
-/// tested outside the game server (see tests/MatchZy.Tests).
+/// tested outside the game server (see tests/AutoTournamentCS2.Tests).
 ///
 /// Workshop maps broke the admin map commands because <c>Server.MapName</c> on a
 /// workshop map is the map's own name (e.g. "de_cache_classic"), not its workshop id,

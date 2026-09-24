@@ -6,7 +6,7 @@ using CounterStrikeSharp.API.Modules.Utils;
 using System.Text.Json.Serialization;
 using System.Runtime.Serialization;
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
     public class Get5Status
     {
@@ -91,7 +91,7 @@ namespace MatchZy
         public string PluginVersion { get; } = "0.15.0";
     }
 
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
         [ConsoleCommand("get5_status", "Returns get5 status")]
         public void Get5StatusCommand(CCSPlayerController? player, CommandInfo command)
@@ -161,13 +161,13 @@ namespace MatchZy
                         CsTeam team = GetPlayerTeam(p);
                         if (team == CsTeam.CounterTerrorist)
                         {
-                            if (reverseTeamSides["CT"] == matchzyTeam1) team1ConnectedClients++;
-                            else if (reverseTeamSides["CT"] == matchzyTeam2) team2ConnectedClients++;
+                            if (reverseTeamSides["CT"] == atTeam1) team1ConnectedClients++;
+                            else if (reverseTeamSides["CT"] == atTeam2) team2ConnectedClients++;
                         }
                         else if (team == CsTeam.Terrorist)
                         {
-                            if (reverseTeamSides["TERRORIST"] == matchzyTeam1) team1ConnectedClients++;
-                            else if (reverseTeamSides["TERRORIST"] == matchzyTeam2) team2ConnectedClients++;
+                            if (reverseTeamSides["TERRORIST"] == atTeam1) team1ConnectedClients++;
+                            else if (reverseTeamSides["TERRORIST"] == atTeam2) team2ConnectedClients++;
                         }
                     }
                 }
@@ -184,22 +184,22 @@ namespace MatchZy
 
                 get5Status.Team1 = new Get5StatusTeam
                 {
-                    Name = matchzyTeam1.teamName,
-                    SeriesScore = matchzyTeam1.seriesScore,
+                    Name = atTeam1.teamName,
+                    SeriesScore = atTeam1.seriesScore,
                     CurrentMapScore = team1,
                     ConnectedClients = team1ConnectedClients,
                     Ready = ready,
-                    Side = teamSides[matchzyTeam1].ToLower()
+                    Side = teamSides[atTeam1].ToLower()
                 };
 
                 get5Status.Team2 = new Get5StatusTeam
                 {
-                    Name = matchzyTeam2.teamName,
-                    SeriesScore = matchzyTeam2.seriesScore,
+                    Name = atTeam2.teamName,
+                    SeriesScore = atTeam2.seriesScore,
                     CurrentMapScore = team2,
                     ConnectedClients = team2ConnectedClients,
                     Ready = ready,
-                    Side = teamSides[matchzyTeam2].ToLower()
+                    Side = teamSides[atTeam2].ToLower()
                 };
             }
 
@@ -224,7 +224,7 @@ namespace MatchZy
 
         private Get5GameState getGet5Gamestate()
         {
-            // Get state from MatchZy state phase data and map to get5 state
+            // Get state from Auto Tournament CS2 state phase data and map to get5 state
             // Get5 states: pre_veto, veto, warmup, knife, waiting_for_knife_decision, going_live, live, pending_restore, post_game
             // Please note, that Get5 have moved from integer based states to string based states, so the integer based states are not used.
             //

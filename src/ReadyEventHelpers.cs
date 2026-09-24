@@ -1,8 +1,8 @@
 using CounterStrikeSharp.API.Core;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
-public partial class MatchZy
+public partial class AutoTournamentCS2
 {
     /// <summary>
     /// Computes logical team1/team2 ready counts for event payloads.
@@ -48,7 +48,7 @@ public partial class MatchZy
 
         if (reverseTeamSides.ContainsKey("CT"))
         {
-            bool ctIsTeam1 = reverseTeamSides["CT"] == matchzyTeam1;
+            bool ctIsTeam1 = reverseTeamSides["CT"] == atTeam1;
             if (ctIsTeam1)
             {
                 readyCountTeam1 = ctReadyCount;
@@ -124,7 +124,7 @@ public partial class MatchZy
         {
             Log($"[SendPlayerReadyEvent] Creating player_ready event for {player.PlayerName}");
             
-            var readyEvent = new MatchZyPlayerReadyEvent
+            var readyEvent = new AutoTournamentCS2PlayerReadyEvent
             {
                 MatchId = liveMatchId,
                 Player = playerInfo,
@@ -147,7 +147,7 @@ public partial class MatchZy
         {
             Log($"[SendPlayerReadyEvent] Creating player_unready event for {player.PlayerName}");
             
-            var unreadyEvent = new MatchZyPlayerUnreadyEvent
+            var unreadyEvent = new AutoTournamentCS2PlayerUnreadyEvent
             {
                 MatchId = liveMatchId,
                 Player = playerInfo,
@@ -190,11 +190,11 @@ public partial class MatchZy
         {
             Log($"[CheckAndSendTeamReadyEvent] CT team is ready, sending team_ready event");
             
-            var teamReadyEvent = new MatchZyTeamReadyEvent
+            var teamReadyEvent = new AutoTournamentCS2TeamReadyEvent
             {
                 MatchId = liveMatchId,
-                Team = reverseTeamSides["CT"] == matchzyTeam1 ? "team1" : "team2",
-                ReadyCount = reverseTeamSides["CT"] == matchzyTeam1 ? readyCountTeam1 : readyCountTeam2,
+                Team = reverseTeamSides["CT"] == atTeam1 ? "team1" : "team2",
+                ReadyCount = reverseTeamSides["CT"] == atTeam1 ? readyCountTeam1 : readyCountTeam2,
                 TotalReady = totalReady,
                 ExpectedTotal = expectedTotal
             };
@@ -209,11 +209,11 @@ public partial class MatchZy
         {
             Log($"[CheckAndSendTeamReadyEvent] T team is ready, sending team_ready event");
             
-            var teamReadyEvent = new MatchZyTeamReadyEvent
+            var teamReadyEvent = new AutoTournamentCS2TeamReadyEvent
             {
                 MatchId = liveMatchId,
-                Team = reverseTeamSides["TERRORIST"] == matchzyTeam1 ? "team1" : "team2",
-                ReadyCount = reverseTeamSides["TERRORIST"] == matchzyTeam1 ? readyCountTeam1 : readyCountTeam2,
+                Team = reverseTeamSides["TERRORIST"] == atTeam1 ? "team1" : "team2",
+                ReadyCount = reverseTeamSides["TERRORIST"] == atTeam1 ? readyCountTeam1 : readyCountTeam2,
                 TotalReady = totalReady,
                 ExpectedTotal = expectedTotal
             };
@@ -237,7 +237,7 @@ public partial class MatchZy
 
             Log($"[CheckAndSendTeamReadyEvent] Both teams ready, sending all_players_ready event");
             
-            var allPlayersReadyEvent = new MatchZyAllPlayersReadyEvent
+            var allPlayersReadyEvent = new AutoTournamentCS2AllPlayersReadyEvent
             {
                 MatchId = liveMatchId,
                 ReadyCountTeam1 = readyCountTeam1,

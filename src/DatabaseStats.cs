@@ -16,7 +16,7 @@ using MySqlConnector;
 
 
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
     public class QueuedEvent
     {
@@ -136,22 +136,47 @@ namespace MatchZy
                 string dbType = IsSqlite ? "SQLite" : "MySQL";
                 Log($"[InitializeDatabase] {dbType} Database connection successful");
 
-                // Create the `matchzy_stats_matches`, `matchzy_stats_players` and `matchzy_stats_maps` tables if they doesn't exist
+                // First start after the rename: move the pre-2.0.0 tables to their at_* names before the
+                // CREATE TABLE IF NOT EXISTS below would make empty new ones.
+                try
+                {
+                    LegacyCarryOver.CarryOverTables(connection, IsSqlite, Log);
+                }
+                catch (Exception ex)
+                {
+                    Log($"[CarryOver] ERROR renaming the old tables: {ex.Message}");
+                    // Another server on the same database may have renamed them first. If old
+                    // tables are still waiting, stop here rather than create empty new ones
+                    // next to them.
+                    if (LegacyCarryOver.HasPendingTables(connection, IsSqlite)) throw;
+                }
+
+                // Create the `at_stats_matches`, `at_stats_players` and `at_stats_maps` tables if they doesn't exist
                 if (IsSqlite) {
                     CreateRequiredTablesSQLite(connection);
                 } else {
                     CreateRequiredTablesSQL(connection);
                 }
 
-                Log("[InitializeDatabase] Table matchzy_stats_matches created (or already exists)");
-                Log("[InitializeDatabase] Table matchzy_stats_players created (or already exists)");
-                Log("[InitializeDatabase] Table matchzy_stats_maps created (or already exists)");
+                Log("[InitializeDatabase] Table at_stats_matches created (or already exists)");
+                Log("[InitializeDatabase] Table at_stats_players created (or already exists)");
+                Log("[InitializeDatabase] Table at_stats_maps created (or already exists)");
                 
                 // Create (or migrate) the server config table for persistent configuration.
                 // Both tables below hold per-server state and are scoped by server identity so
                 // several servers can share one database; see PersistentConfigStore.
                 PersistentConfigStore.EnsureConfigSchema(connection, IsSqlite, Log);
-                Log("[InitializeDatabase] Table matchzy_server_config created (or already exists)");
+                Log("[InitializeDatabase] Table at_server_config created (or already exists)");
+
+                // Settings saved before the rename are keyed by their pre-2.0.0 names.
+                try
+                {
+                    LegacyCarryOver.CarryOverConfigKeys(connection, IsSqlite, Log);
+                }
+                catch (Exception ex)
+                {
+                    Log($"[CarryOver] ERROR renaming saved settings: {ex.Message}");
+                }
 
                 // Create event queue table for reliable event delivery
                 if (IsSqlite) {
@@ -160,7 +185,7 @@ namespace MatchZy
                     CreateEventQueueTableSQL(connection);
                 }
                 PersistentConfigStore.EnsureEventQueueSchema(connection, IsSqlite, Log);
-                Log("[InitializeDatabase] Table matchzy_event_queue created (or already exists)");
+                Log("[InitializeDatabase] Table at_event_queue created (or already exists)");
             }
             catch (Exception ex)
             {
@@ -174,7 +199,7 @@ namespace MatchZy
                 }
                 else if (databaseType == DatabaseType.SQLite)
                 {
-                    string dbPath = Path.Join(directory, "matchzy.db");
+                    string dbPath = Path.Join(directory, "auto_tournament_cs2.db");
                     Log($"[InitializeDatabase - FATAL] SQLite database path: {dbPath}");
                 }
             }
@@ -214,7 +239,7 @@ namespace MatchZy
 
                 if (databaseType == DatabaseType.SQLite)
                 {
-                    string dbPath = Path.Join(directory, "matchzy.db");
+                    string dbPath = Path.Join(directory, "auto_tournament_cs2.db");
                     connectionString = $"Data Source={dbPath}";
                     Log($"[ConnectDatabase] Using SQLite database: {dbPath}");
                 }
@@ -232,7 +257,7 @@ namespace MatchZy
                 else
                 {
                     Log($"[ConnectDatabase] Invalid database specified, using SQLite.");
-                    connectionString = $"Data Source={Path.Join(directory, "matchzy.db")}";
+                    connectionString = $"Data Source={Path.Join(directory, "auto_tournament_cs2.db")}";
                     databaseType = DatabaseType.SQLite;
                 }
             } 
@@ -251,7 +276,7 @@ namespace MatchZy
         private static void CreateRequiredTablesSQLite(IDbConnection connection)
         {
             connection.Execute($@"
-            CREATE TABLE IF NOT EXISTS matchzy_stats_matches (
+            CREATE TABLE IF NOT EXISTS at_stats_matches (
                 matchid INTEGER PRIMARY KEY AUTOINCREMENT,
                 start_time DATETIME NOT NULL,
                 end_time DATETIME DEFAULT NULL,
@@ -265,7 +290,7 @@ namespace MatchZy
             )");
 
             connection.Execute(@"
-                CREATE TABLE IF NOT EXISTS matchzy_stats_maps (
+                CREATE TABLE IF NOT EXISTS at_stats_maps (
                     matchid INTEGER NOT NULL,
                     mapnumber INTEGER NOT NULL,
                     start_time DATETIME NOT NULL,
@@ -275,11 +300,11 @@ namespace MatchZy
                     team1_score INTEGER NOT NULL DEFAULT 0,
                     team2_score INTEGER NOT NULL DEFAULT 0,
                     PRIMARY KEY (matchid, mapnumber),
-                    FOREIGN KEY (matchid) REFERENCES matchzy_stats_matches (matchid)
+                    FOREIGN KEY (matchid) REFERENCES at_stats_matches (matchid)
                 )");
 
             connection.Execute(@"
-                CREATE TABLE IF NOT EXISTS matchzy_stats_players (
+                CREATE TABLE IF NOT EXISTS at_stats_players (
                     matchid INTEGER NOT NULL,
                     mapnumber INTEGER NOT NULL,
                     steamid64 INTEGER NOT NULL,
@@ -317,15 +342,15 @@ namespace MatchZy
                     cash_earned INTEGER NOT NULL,
                     enemies_flashed INTEGER NOT NULL,
                     PRIMARY KEY (matchid, mapnumber, steamid64),
-                    FOREIGN KEY (matchid) REFERENCES matchzy_stats_matches (matchid),
-                    FOREIGN KEY (matchid, mapnumber) REFERENCES matchzy_stats_maps (matchid, mapnumber)
+                    FOREIGN KEY (matchid) REFERENCES at_stats_matches (matchid),
+                    FOREIGN KEY (matchid, mapnumber) REFERENCES at_stats_maps (matchid, mapnumber)
                 )");
         }
 
         private static void CreateRequiredTablesSQL(IDbConnection connection)
         {
             connection.Execute($@"
-                CREATE TABLE IF NOT EXISTS matchzy_stats_matches (
+                CREATE TABLE IF NOT EXISTS at_stats_matches (
                     matchid INT PRIMARY KEY AUTO_INCREMENT,
                     start_time DATETIME NOT NULL,
                     end_time DATETIME DEFAULT NULL,
@@ -339,7 +364,7 @@ namespace MatchZy
                 )");
                 
             connection.Execute($@"
-            CREATE TABLE IF NOT EXISTS matchzy_stats_maps (
+            CREATE TABLE IF NOT EXISTS at_stats_maps (
                 matchid INT NOT NULL,
                 mapnumber TINYINT(3) UNSIGNED NOT NULL,
                 start_time DATETIME NOT NULL,
@@ -350,11 +375,11 @@ namespace MatchZy
                 team2_score INT NOT NULL DEFAULT 0,
                 PRIMARY KEY (matchid, mapnumber),
                 INDEX mapnumber_index (mapnumber),
-                CONSTRAINT matchzy_stats_maps_matchid FOREIGN KEY (matchid) REFERENCES matchzy_stats_matches (matchid)
+                CONSTRAINT at_stats_maps_matchid FOREIGN KEY (matchid) REFERENCES at_stats_matches (matchid)
             )");
 
             connection.Execute($@"
-            CREATE TABLE IF NOT EXISTS matchzy_stats_players (
+            CREATE TABLE IF NOT EXISTS at_stats_players (
                 matchid INT NOT NULL,
                 mapnumber TINYINT(3) UNSIGNED NOT NULL,
                 steamid64 BIGINT NOT NULL,
@@ -393,14 +418,14 @@ namespace MatchZy
                 enemies_flashed INT NOT NULL,
                 PRIMARY KEY (matchid, mapnumber, steamid64),
                 CONSTRAINT fk_player_map_ref FOREIGN KEY (matchid, mapnumber) 
-                    REFERENCES matchzy_stats_maps (matchid, mapnumber)
+                    REFERENCES at_stats_maps (matchid, mapnumber)
             )");
         }
 
         private static void CreateEventQueueTableSQLite(IDbConnection connection)
         {
             connection.Execute(@"
-                CREATE TABLE IF NOT EXISTS matchzy_event_queue (
+                CREATE TABLE IF NOT EXISTS at_event_queue (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     event_type TEXT NOT NULL,
                     event_data TEXT NOT NULL,
@@ -418,13 +443,13 @@ namespace MatchZy
             // Create index for efficient querying of pending events
             connection.Execute(@"
                 CREATE INDEX IF NOT EXISTS idx_event_queue_status_retry 
-                ON matchzy_event_queue(status, next_retry)");
+                ON at_event_queue(status, next_retry)");
         }
 
         private static void CreateEventQueueTableSQL(IDbConnection connection)
         {
             connection.Execute(@"
-                CREATE TABLE IF NOT EXISTS matchzy_event_queue (
+                CREATE TABLE IF NOT EXISTS at_event_queue (
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     event_type VARCHAR(100) NOT NULL,
                     event_data TEXT NOT NULL,
@@ -480,7 +505,7 @@ namespace MatchZy
                 // Stamped with this server's scope so a shared database does not let one server
                 // retry another server's events against the wrong remote log URL and headers.
                 connection.Execute($@"
-                    INSERT INTO matchzy_event_queue
+                    INSERT INTO at_event_queue
                     (event_type, event_data, match_id, map_number, error_message, next_retry, server_scope)
                     VALUES (@EventType, @EventData, @MatchId, @MapNumber, @ErrorMessage, {nextRetryExpression}, @Scope)",
                     new { EventType = eventType, EventData = eventData, MatchId = matchId, MapNumber = mapNumber, ErrorMessage = errorMessage, Scope = ServerScope }
@@ -508,7 +533,7 @@ namespace MatchZy
                 
                 var events = connection.Query<QueuedEvent>($@"
                     SELECT id, event_type, event_data, match_id, map_number, retry_count
-                    FROM matchzy_event_queue
+                    FROM at_event_queue
                     WHERE status = 'pending'
                     AND {PersistentConfigStore.PendingEventsScopeClause}
                     AND (next_retry IS NULL OR next_retry <= {nowExpression})
@@ -536,7 +561,7 @@ namespace MatchZy
             {
                 using IDbConnection connection = OpenConnection();
                 connection.Execute(@"
-                    UPDATE matchzy_event_queue 
+                    UPDATE at_event_queue 
                     SET status = 'sent' 
                     WHERE id = @Id",
                     new { Id = eventId }
@@ -574,7 +599,7 @@ namespace MatchZy
                 {
                     // Max retries reached, mark as failed
                     connection.Execute(@"
-                        UPDATE matchzy_event_queue 
+                        UPDATE at_event_queue 
                         SET retry_count = @RetryCount, 
                             last_retry = " + lastRetryExpression + @",
                             status = 'failed',
@@ -587,7 +612,7 @@ namespace MatchZy
                 else
                 {
                     connection.Execute($@"
-                        UPDATE matchzy_event_queue 
+                        UPDATE at_event_queue 
                         SET retry_count = @RetryCount, 
                             last_retry = {lastRetryExpression},
                             next_retry = {nextRetryExpression},
@@ -623,7 +648,7 @@ namespace MatchZy
                 // them is pure housekeeping. Keeping it global also stops a decommissioned
                 // server's rows accumulating forever in a shared database.
                 int deleted = connection.Execute($@"
-                    DELETE FROM matchzy_event_queue
+                    DELETE FROM at_event_queue
                     WHERE status = 'sent'
                     AND created_at < {dateExpression}
                 ");
@@ -654,7 +679,7 @@ namespace MatchZy
                 // when this server's remote log URL changes, which says nothing about the events
                 // another server on the same database still needs to send.
                 int deleted = connection.Execute($@"
-                    DELETE FROM matchzy_event_queue
+                    DELETE FROM at_event_queue
                     WHERE status IN ('pending', 'failed')
                     AND {PersistentConfigStore.PendingEventsScopeClause}
                 ", new { Scope = ServerScope, LegacyScope = ServerIdentity.LegacyScope });
@@ -704,7 +729,7 @@ namespace MatchZy
                 
                 // Get match info
                 var match = connection.QueryFirstOrDefault<dynamic>(@"
-                    SELECT * FROM matchzy_stats_matches 
+                    SELECT * FROM at_stats_matches 
                     WHERE matchid = @MatchId",
                     new { MatchId = matchId }
                 );
@@ -716,7 +741,7 @@ namespace MatchZy
                 
                 // Get map info
                 var maps = connection.Query<dynamic>(@"
-                    SELECT * FROM matchzy_stats_maps 
+                    SELECT * FROM at_stats_maps 
                     WHERE matchid = @MatchId
                     ORDER BY mapnumber",
                     new { MatchId = matchId }
@@ -724,7 +749,7 @@ namespace MatchZy
                 
                 // Get player stats
                 var players = connection.Query<dynamic>(@"
-                    SELECT * FROM matchzy_stats_players 
+                    SELECT * FROM at_stats_players 
                     WHERE matchid = @MatchId
                     ORDER BY mapnumber, team, name",
                     new { MatchId = matchId }
@@ -760,12 +785,12 @@ namespace MatchZy
                 if (mapNumber == 0) {
                     if (isMatchSetup && liveMatchId != -1) {
                         connection.Execute(@"
-                            INSERT INTO matchzy_stats_matches (matchid, start_time, team1_name, team2_name, series_type, server_ip)
+                            INSERT INTO at_stats_matches (matchid, start_time, team1_name, team2_name, series_type, server_ip)
                             VALUES (@liveMatchId, " + dateTimeExpression + ", @team1name, @team2name, @seriesType, @serverIp)",
                             new { liveMatchId, team1name, team2name, seriesType, serverIp });
                     } else {
                         connection.Execute(@"
-                            INSERT INTO matchzy_stats_matches (start_time, team1_name, team2_name, series_type, server_ip)
+                            INSERT INTO at_stats_matches (start_time, team1_name, team2_name, series_type, server_ip)
                             VALUES (" + dateTimeExpression + ", @team1name, @team2name, @seriesType, @serverIp)",
                             new { team1name, team2name, seriesType, serverIp });
                     }
@@ -773,7 +798,7 @@ namespace MatchZy
 
                 if (isMatchSetup && liveMatchId != -1) {
                     connection.Execute(@"
-                        INSERT INTO matchzy_stats_maps (matchid, start_time, mapnumber, mapname)
+                        INSERT INTO at_stats_maps (matchid, start_time, mapnumber, mapname)
                         VALUES (@liveMatchId, " + dateTimeExpression + ", @mapNumber, @mapName)",
                         new { liveMatchId, mapNumber, mapName });
                     return liveMatchId;
@@ -791,11 +816,11 @@ namespace MatchZy
                 }
 
                 connection.Execute(@"
-                    INSERT INTO matchzy_stats_maps (matchid, start_time, mapnumber, mapname)
+                    INSERT INTO at_stats_maps (matchid, start_time, mapnumber, mapname)
                     VALUES (@matchId, " + dateTimeExpression + ", @mapNumber, @mapName)",
                     new { matchId, mapNumber, mapName });
 
-                Log($"[InsertMatchData] Data inserted into matchzy_stats_matches with match_id: {matchId}");
+                Log($"[InsertMatchData] Data inserted into at_stats_matches with match_id: {matchId}");
                 return matchId;
             }
             catch (Exception ex)
@@ -810,7 +835,7 @@ namespace MatchZy
             {
                 using IDbConnection connection = OpenConnection();
                 connection.Execute(@"
-                    UPDATE matchzy_stats_matches
+                    UPDATE at_stats_matches
                     SET team1_name = @team1name, team2_name = @team2name
                     WHERE matchid = @matchId",
                     new { matchId, team1name, team2name });
@@ -831,14 +856,14 @@ namespace MatchZy
                 string dateTimeExpression = IsSqlite ? "datetime('now')" : "NOW()";
 
                 string sqlQuery = $@"
-                    UPDATE matchzy_stats_maps
+                    UPDATE at_stats_maps
                     SET winner = @winnerName, end_time = {dateTimeExpression}, team1_score = @t1score, team2_score = @t2score
                     WHERE matchid = @matchId AND mapNumber = @mapNumber";
 
                 await connection.ExecuteAsync(sqlQuery, new { matchId, winnerName, t1score, t2score, mapNumber });
 
                 sqlQuery = $@"
-                    UPDATE matchzy_stats_matches
+                    UPDATE at_stats_matches
                     SET team1_score = @team1SeriesScore, team2_score = @team2SeriesScore
                     WHERE matchid = @matchId";
 
@@ -860,7 +885,7 @@ namespace MatchZy
                 string dateTimeExpression = IsSqlite ? "datetime('now')" : "NOW()";
 
                 string sqlQuery = $@"
-                    UPDATE matchzy_stats_matches
+                    UPDATE at_stats_matches
                     SET winner = @winnerName, end_time = {dateTimeExpression}, team1_score = @t1score, team2_score = @t2score
                     WHERE matchid = @matchId";
 
@@ -880,7 +905,7 @@ namespace MatchZy
             {
                 await using DbConnection connection = await OpenConnectionAsync();
                 string sqlQuery = $@"
-                    UPDATE matchzy_stats_maps
+                    UPDATE at_stats_maps
                     SET team1_score = @t1score, team2_score = @t2score
                     WHERE matchid = @matchId AND mapnumber = @mapNumber";
 
@@ -904,7 +929,7 @@ namespace MatchZy
                     var playerStats = playerStatsDictionary[steamid64];
 
                     string sqlQuery = $@"
-                    INSERT INTO matchzy_stats_players (
+                    INSERT INTO at_stats_players (
                         matchid, mapnumber, steamid64, team, name, kills, deaths, damage, assists,
                         enemy5ks, enemy4ks, enemy3ks, enemy2ks, utility_count, utility_damage,
                         utility_successes, utility_enemies, flash_count, flash_successes,
@@ -937,7 +962,7 @@ namespace MatchZy
 
                     if (IsSqlite) {
                         sqlQuery = @"
-                        INSERT OR REPLACE INTO matchzy_stats_players (
+                        INSERT OR REPLACE INTO at_stats_players (
                             matchid, mapnumber, steamid64, team, name, kills, deaths, damage, assists,
                             enemy5ks, enemy4ks, enemy3ks, enemy2ks, utility_count, utility_damage,
                             utility_successes, utility_enemies, flash_count, flash_successes,
@@ -1023,7 +1048,7 @@ namespace MatchZy
                 using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
                 {
                     IEnumerable<dynamic> playerStatsData = await connection.QueryAsync(
-                        "SELECT * FROM matchzy_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC", new { MatchId = matchId, MapNumber = mapNumber });
+                        "SELECT * FROM at_stats_players WHERE matchid = @MatchId AND mapnumber = @MapNumber ORDER BY team, kills DESC", new { MatchId = matchId, MapNumber = mapNumber });
 
                     // Use the first data row to get the column names
                     dynamic? firstDataRow = playerStatsData.FirstOrDefault();
@@ -1068,6 +1093,9 @@ namespace MatchZy
                 MySqlPort = 3306
             };
 
+            string? configDirectory = Path.GetDirectoryName(configFile);
+            if (!string.IsNullOrEmpty(configDirectory)) Directory.CreateDirectory(configDirectory);
+
             // Serialize and save the default configuration to the file
             string defaultConfigJson = JsonSerializer.Serialize(defaultConfig, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(configFile, defaultConfigJson);
@@ -1078,7 +1106,7 @@ namespace MatchZy
         private void SetDatabaseConfig(string directory)
         {
             string fileName = "database.json";
-            string configFile = Path.Combine(Server.GameDirectory + "/csgo/cfg/MatchZy", fileName);
+            string configFile = Path.Combine(Server.GameDirectory + "/csgo/cfg/AutoTournamentCS2", fileName);
             if (!File.Exists(configFile))
             {
                 // Create a default configuration if the file doesn't exist
@@ -1107,7 +1135,7 @@ namespace MatchZy
 
         private void Log(string message)
         {
-            Console.WriteLine("[MatchZy] " + message);
+            Console.WriteLine("[Auto Tournament] " + message);
         }
 
         /// <summary>

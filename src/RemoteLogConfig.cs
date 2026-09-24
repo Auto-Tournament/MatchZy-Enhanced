@@ -4,12 +4,12 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
         [ConsoleCommand("get5_remote_log_url", "If defined, all events are sent to this URL over HTTP. If no protocol is provided")]
-        [ConsoleCommand("matchzy_remote_log_url", "If defined, all events are sent to this URL over HTTP. If no protocol is provided")]
+        [ConsoleCommand("at_remote_log_url", "If defined, all events are sent to this URL over HTTP. If no protocol is provided")]
         public void RemoteLogURLCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -30,7 +30,7 @@ namespace MatchZy
             remoteLogUrlMissingWarningLogged = false;
             
             // Persist to database so it survives server restarts
-            database.SaveConfigValue("matchzy_remote_log_url", url);
+            database.SaveConfigValue("at_remote_log_url", url);
             Log($"[RemoteLogURLCommand] Remote log URL set and persisted to database: {SecretRedactor.RedactText(url)}");
             
             // If URL changed, clear old failed events that were queued with the previous URL
@@ -49,7 +49,7 @@ namespace MatchZy
         }
 
         [ConsoleCommand("get5_remote_log_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for events")]
-        [ConsoleCommand("matchzy_remote_log_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for events")]
+        [ConsoleCommand("at_remote_log_header_key", "If defined, a custom HTTP header with this name is added to the HTTP requests for events")]
         public void RemoteLogHeaderKeyCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -60,13 +60,13 @@ namespace MatchZy
                 matchConfig.RemoteLogHeaderKey = header;
                 
                 // Persist to database so it survives server restarts
-                database.SaveConfigValue("matchzy_remote_log_header_key", header);
+                database.SaveConfigValue("at_remote_log_header_key", header);
                 Log($"[RemoteLogHeaderKeyCommand] Remote log header key set and persisted to database: {header}");
             }
         }
 
         [ConsoleCommand("get5_remote_log_header_value", "If defined, the value of the custom header added to the events sent over HTTP")]
-        [ConsoleCommand("matchzy_remote_log_header_value", "If defined, the value of the custom header added to the events sent over HTTP")]
+        [ConsoleCommand("at_remote_log_header_value", "If defined, the value of the custom header added to the events sent over HTTP")]
         public void RemoteLogHeaderValueCommand(CCSPlayerController? player, CommandInfo command)
         {
             if (player != null) return;
@@ -77,7 +77,7 @@ namespace MatchZy
                 matchConfig.RemoteLogHeaderValue = headerValue;
                 
                 // Persist to database so it survives server restarts
-                database.SaveConfigValue("matchzy_remote_log_header_value", headerValue);
+                database.SaveConfigValue("at_remote_log_header_value", headerValue);
                 Log($"[RemoteLogHeaderValueCommand] Remote log header value set and persisted to database");
             }
         }
@@ -99,7 +99,7 @@ namespace MatchZy
                 // This ensures the API receives a valid server identifier
                 if (string.IsNullOrEmpty(matchReportServerId.Value))
                 {
-                    Log("[SendServerConfiguredEvent] Skipping: Server ID not configured. Set matchzy_server_id before configuring remote log URL.");
+                    Log("[SendServerConfiguredEvent] Skipping: Server ID not configured. Set at_server_id before configuring remote log URL.");
                     return;
                 }
 
@@ -107,7 +107,7 @@ namespace MatchZy
                 var hostnameConvar = ConVar.Find("hostname");
                 string hostname = hostnameConvar?.StringValue ?? "Unknown Server";
 
-                var serverConfiguredEvent = new MatchZyServerConfiguredEvent
+                var serverConfiguredEvent = new AutoTournamentCS2ServerConfiguredEvent
                 {
                     ServerId = matchReportServerId.Value,
                     Hostname = hostname,
@@ -151,7 +151,7 @@ namespace MatchZy
 
                 var (ok, dbType, error) = database.CheckHealth();
 
-                var ev = new MatchZyServerHealthEvent
+                var ev = new AutoTournamentCS2ServerHealthEvent
                 {
                     ServerId = matchReportServerId.Value,
                     PluginVersion = ModuleVersion,

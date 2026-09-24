@@ -4,12 +4,12 @@ using System.Data;
 using System.Linq;
 using Dapper;
 
-namespace MatchZy;
+namespace AutoTournamentCS2;
 
 /// <summary>
-/// Schema and access for the server-scoped tables in the MatchZy database.
+/// Schema and access for the server-scoped tables in the Auto Tournament CS2 database.
 ///
-/// Both <c>matchzy_server_config</c> and <c>matchzy_event_queue</c> hold per-server state, and
+/// Both <c>at_server_config</c> and <c>at_event_queue</c> hold per-server state, and
 /// both used to be keyed without any notion of which server a row belongs to. When several
 /// servers share one database (the normal multi-server setup) that means config values collide
 /// and queued events get retried by the wrong server, with the wrong remote log URL and headers.
@@ -30,15 +30,15 @@ namespace MatchZy;
 /// </summary>
 public static class PersistentConfigStore
 {
-    public const string ConfigTable = "matchzy_server_config";
-    public const string EventQueueTable = "matchzy_event_queue";
+    public const string ConfigTable = "at_server_config";
+    public const string EventQueueTable = "at_event_queue";
     public const string ScopeColumn = "server_scope";
 
     /// <summary>Name the legacy config table is parked under while SQLite rebuilds it.</summary>
-    private const string ConfigTableRebuildName = "matchzy_server_config_pre_scope";
+    private const string ConfigTableRebuildName = "at_server_config_pre_scope";
 
     /// <summary>
-    /// Creates <c>matchzy_server_config</c> when it is missing, or migrates an existing unscoped
+    /// Creates <c>at_server_config</c> when it is missing, or migrates an existing unscoped
     /// table in place. Safe to run on every startup: it is a no-op once the column is present.
     /// </summary>
     public static void EnsureConfigSchema(IDbConnection connection, bool isSqlite, Action<string>? log = null)
@@ -70,7 +70,7 @@ public static class PersistentConfigStore
     }
 
     /// <summary>
-    /// Adds <c>server_scope</c> to <c>matchzy_event_queue</c> when it is missing. Existing queued
+    /// Adds <c>server_scope</c> to <c>at_event_queue</c> when it is missing. Existing queued
     /// events keep the legacy scope; see <see cref="PendingEventsScopeClause"/> for how they are
     /// drained.
     /// </summary>

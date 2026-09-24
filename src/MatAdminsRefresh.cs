@@ -7,59 +7,59 @@ using System.Threading.Tasks;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Modules.Timers;
 
-namespace MatchZy
+namespace AutoTournamentCS2
 {
-    public partial class MatchZy
+    public partial class AutoTournamentCS2
     {
         private static readonly HttpClient MatAdminsHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(3),
         };
 
-        private string matchzyAdminsUrl = "";
-        private int matchzyAdminsRefreshSeconds = 0;
-        private CounterStrikeSharp.API.Modules.Timers.Timer? matchzyAdminsRefreshTimer = null;
-        private bool matchzyAdminsFetchInFlight = false;
+        private string atAdminsUrl = "";
+        private int atAdminsRefreshSeconds = 0;
+        private CounterStrikeSharp.API.Modules.Timers.Timer? atAdminsRefreshTimer = null;
+        private bool atAdminsFetchInFlight = false;
 
-        private void StartMatchzyAdminsRefreshTimerIfConfigured(string reason)
+        private void StartAutoTournamentCS2AdminsRefreshTimerIfConfigured(string reason)
         {
             try
             {
-                matchzyAdminsRefreshTimer?.Kill();
+                atAdminsRefreshTimer?.Kill();
             }
             catch
             {
                 // ignore
             }
-            matchzyAdminsRefreshTimer = null;
+            atAdminsRefreshTimer = null;
 
-            if (string.IsNullOrWhiteSpace(matchzyAdminsUrl) || matchzyAdminsRefreshSeconds <= 0)
+            if (string.IsNullOrWhiteSpace(atAdminsUrl) || atAdminsRefreshSeconds <= 0)
             {
                 return;
             }
 
             // Fire once immediately, then poll.
-            FetchAndApplyMatchzyAdmins(reason);
-            matchzyAdminsRefreshTimer = AddTimer(matchzyAdminsRefreshSeconds, () =>
+            FetchAndApplyAutoTournamentCS2Admins(reason);
+            atAdminsRefreshTimer = AddTimer(atAdminsRefreshSeconds, () =>
             {
-                FetchAndApplyMatchzyAdmins("timer");
+                FetchAndApplyAutoTournamentCS2Admins("timer");
             }, TimerFlags.REPEAT);
         }
 
-        private void FetchAndApplyMatchzyAdmins(string reason)
+        private void FetchAndApplyAutoTournamentCS2Admins(string reason)
         {
-            if (matchzyAdminsFetchInFlight) return;
-            if (string.IsNullOrWhiteSpace(matchzyAdminsUrl)) return;
+            if (atAdminsFetchInFlight) return;
+            if (string.IsNullOrWhiteSpace(atAdminsUrl)) return;
 
-            var url = matchzyAdminsUrl.Trim();
+            var url = atAdminsUrl.Trim();
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
             {
-                Log($"[matchzy_admins] Invalid admins URL (must be http/https): {SecretRedactor.RedactText(url)}");
+                Log($"[at_admins] Invalid admins URL (must be http/https): {SecretRedactor.RedactText(url)}");
                 return;
             }
 
-            matchzyAdminsFetchInFlight = true;
+            atAdminsFetchInFlight = true;
             Task.Run(async () =>
             {
                 try
@@ -71,7 +71,7 @@ namespace MatchZy
                     var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     if (!response.IsSuccessStatusCode)
                     {
-                        Log($"[matchzy_admins] Fetch failed ({(int)response.StatusCode}) ({reason})");
+                        Log($"[at_admins] Fetch failed ({(int)response.StatusCode}) ({reason})");
                         return;
                     }
 
@@ -84,7 +84,7 @@ namespace MatchZy
                     if (!doc.RootElement.TryGetProperty("admins", out var adminsEl) ||
                         adminsEl.ValueKind != JsonValueKind.Array)
                     {
-                        Log($"[matchzy_admins] Invalid payload (missing 'admins' array) ({reason})");
+                        Log($"[at_admins] Invalid payload (missing 'admins' array) ({reason})");
                         return;
                     }
 
@@ -101,30 +101,30 @@ namespace MatchZy
                     {
                         try
                         {
-                            WriteLegacyMatchzyAdminsJson(dict);
+                            WriteLegacyAutoTournamentCS2AdminsJson(dict);
                             loadedAdmins = dict;
-                            Log($"[matchzy_admins] Updated admins list: {loadedAdmins.Count} entries ({reason})");
+                            Log($"[at_admins] Updated admins list: {loadedAdmins.Count} entries ({reason})");
                         }
                         catch (Exception ex)
                         {
-                            Log($"[matchzy_admins] Failed to apply admins list: {ex.Message}");
+                            Log($"[at_admins] Failed to apply admins list: {ex.Message}");
                         }
                     });
                 }
                 catch (Exception ex)
                 {
-                    Log($"[matchzy_admins] Fetch exception ({reason}): {ex.Message}");
+                    Log($"[at_admins] Fetch exception ({reason}): {ex.Message}");
                 }
                 finally
                 {
-                    matchzyAdminsFetchInFlight = false;
+                    atAdminsFetchInFlight = false;
                 }
             });
         }
 
-        private void WriteLegacyMatchzyAdminsJson(Dictionary<string, string> admins)
+        private void WriteLegacyAutoTournamentCS2AdminsJson(Dictionary<string, string> admins)
         {
-            string fileName = "MatchZy/admins.json";
+            string fileName = "AutoTournamentCS2/admins.json";
             string filePath = Path.Join(Server.GameDirectory + "/csgo/cfg", fileName);
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
