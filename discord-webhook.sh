@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# MatchZy - Discord Webhook Script
-# Sends a Discord webhook notification for a MatchZy release
+# Auto Tournament CS2 (1.x) - Discord Webhook Script
+# Sends a Discord webhook notification for an Auto Tournament CS2 release
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,10 +25,10 @@ fi
 cd "${PROJECT_ROOT}"
 
 # Configuration
-REPO_OWNER="sivert-io"
-REPO_NAME="MatchZy"
+REPO_OWNER="Auto-Tournament"
+REPO_NAME="cs2-plugin"
 
-echo -e "${GREEN}MatchZy - Discord Webhook${NC}"
+echo -e "${GREEN}Auto Tournament CS2 - Discord Webhook${NC}"
 echo "========================================="
 echo ""
 
@@ -81,8 +81,9 @@ get_changelog() {
     local prev_tag
     local current_tag="v${NEW_VERSION}"
     
-    # Get the previous tag (second most recent, excluding the current one)
-    prev_tag=$(git tag --sort=-v:refname | grep -v "^${current_tag}$" | sed -n '1p' 2>/dev/null || echo "")
+    # The previous release on this branch: the newest tag reachable from HEAD, excluding the
+    # current one. Not the newest tag in the repo, which on the 1.4.x hotfix branch is v2.x.
+    prev_tag=$(git tag --merged HEAD --sort=-v:refname | grep -v "^${current_tag}$" | sed -n '1p' 2>/dev/null || echo "")
     
     # Extract PR titles from merge commits
     # Format: "Merge pull request #XX..." followed by blank line, then PR title
@@ -225,9 +226,9 @@ if command -v jq &> /dev/null; then
     echo "$CHANGELOG" > /tmp/changelog.txt
     
     jq -n \
-        --arg content "🚀 **New MatchZy Release: v${NEW_VERSION}**" \
-        --arg title "MatchZy v${NEW_VERSION}" \
-        --arg description "A new version of the MatchZy CS2 plugin has been released." \
+        --arg content "🚀 **New Auto Tournament CS2 Release: v${NEW_VERSION}**" \
+        --arg title "Auto Tournament CS2 v${NEW_VERSION}" \
+        --arg description "A new version of the Auto Tournament CS2 plugin has been released." \
         --arg changelog "$(cat /tmp/changelog.txt)" \
         --arg github "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/v${NEW_VERSION}" \
         --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -250,7 +251,7 @@ if command -v jq &> /dev/null; then
               }
             ],
             footer: {
-              text: "MatchZy"
+              text: "Auto Tournament CS2"
             },
             timestamp: $timestamp
           }]
@@ -263,10 +264,10 @@ else
     
     cat > "$TEMP_JSON" <<EOF
 {
-  "content": "🚀 **New MatchZy Release: v${NEW_VERSION}**",
+  "content": "🚀 **New Auto Tournament CS2 Release: v${NEW_VERSION}**",
   "embeds": [{
-    "title": "MatchZy v${NEW_VERSION}",
-    "description": "A new version of the MatchZy CS2 plugin has been released.",
+    "title": "Auto Tournament CS2 v${NEW_VERSION}",
+    "description": "A new version of the Auto Tournament CS2 plugin has been released.",
     "color": 3066993,
     "fields": [
       {
@@ -281,7 +282,7 @@ else
       }
     ],
     "footer": {
-      "text": "MatchZy"
+      "text": "Auto Tournament CS2"
     },
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   }]
