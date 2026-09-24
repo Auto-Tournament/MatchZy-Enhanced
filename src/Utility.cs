@@ -4210,18 +4210,37 @@ namespace MatchZy
             return value;
         }
 
-        public async Task UploadFileAsync(string? filePath, string fileUploadURL, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber)
+        // "<kind>:<matchId>" pairs whose "no upload URL" line was already logged (see UploadFileAsync).
+        private readonly HashSet<string> uploadSkipLogged = new();
+
+        /// <summary>
+        /// Uploads a demo (<paramref name="isDemo"/> true) or a round backup JSON (false) over HTTP.
+        /// Only demos send the demo_upload_* events and the chat messages; a round backup is not a demo.
+        /// </summary>
+        public async Task UploadFileAsync(string? filePath, string fileUploadURL, string headerKey, string headerValue, long matchId, int mapNumber, int roundNumber, bool isDemo = true)
         {
+            string kind = isDemo ? "demo" : "round backup";
+            string marker = isDemo ? "[DEMO_UPLOAD]" : "[BACKUP_UPLOAD]";
+
             if (filePath == null || fileUploadURL == "")
             {
-                Log($"[UploadFileAsync] Not able to upload the file, either filePath or fileUploadURL is not set. filePath: {filePath} fileUploadURL: {fileUploadURL}");
-                if (filePath != null && File.Exists(filePath))
+                // Without the platform (or another panel) there is no upload URL, and that is fine:
+                // the file stays on the server. Say so once per match, not on every round.
+                bool firstForMatch;
+                lock (uploadSkipLogged)
                 {
-                    FileInfo fileInfo = new FileInfo(filePath);
-                    Log($"[UploadFileAsync] Demo file exists locally at: {filePath} (Size: {fileInfo.Length / 1024 / 1024} MB)");
-                    Log($"[UploadFileAsync] To enable upload, set matchzy_demo_upload_url in your config.");
+                    firstForMatch = uploadSkipLogged.Add($"{kind}:{matchId}");
                 }
-                Log($"[DEMO_UPLOAD] SKIPPED matchId={matchId} map={mapNumber} reason=\"missing_filePath_or_uploadUrl\"");
+                if (firstForMatch)
+                {
+                    string urlConvar = isDemo ? "matchzy_demo_upload_url" : "matchzy_remote_backup_url";
+                    string where = filePath == null ? "on the server" : $"on the server in {Path.GetDirectoryName(filePath)}";
+                    Log($"[UploadFileAsync] {char.ToUpperInvariant(kind[0])}{kind.Substring(1)} files for match {matchId} are not uploaded because {urlConvar} is not set; they stay {where}. Logged once per match.");
+                }
+                if (isDemo)
+                {
+                    Log($"{marker} SKIPPED matchId={matchId} map={mapNumber} reason=\"missing_filePath_or_uploadUrl\"");
+                }
                 return;
             }
 
@@ -4256,41 +4275,44 @@ namespace MatchZy
                 {
                     Timeout = TimeSpan.FromSeconds(60),
                 };
-                Log($"[UploadFileAsync] ===== Starting demo upload =====");
+                Log($"[UploadFileAsync] ===== Starting {kind} upload =====");
                 Log($"[UploadFileAsync] Upload URL: {fileUploadURL}");
                 Log($"[UploadFileAsync] File path: {filePath}");
-                Log($"[DEMO_UPLOAD] START matchId={matchId} map={mapNumber} round={roundNumber} url=\"{fileUploadURL}\" file=\"{Path.GetFileName(filePath)}\"");
+                Log($"{marker} START matchId={matchId} map={mapNumber} round={roundNumber} url=\"{fileUploadURL}\" file=\"{Path.GetFileName(filePath)}\"");
 
                 if (!File.Exists(filePath))
                 {
                     Log($"[UploadFileAsync ERROR] File not found: {filePath}");
-                    Log($"[UploadFileAsync ERROR] The demo file was not created. Check if GOTV is enabled (tv_enable 1)");
-                    Log($"[DEMO_UPLOAD] FAIL matchId={matchId} map={mapNumber} reason=\"file_not_found\"");
+                    if (isDemo) Log($"[UploadFileAsync ERROR] The demo file was not created. Check if GOTV is enabled (tv_enable 1)");
+                    Log($"{marker} FAIL matchId={matchId} map={mapNumber} reason=\"file_not_found\"");
 
                     // Emit demo upload failure (best-effort).
-                    _ = Task.Run(async () =>
+                    if (isDemo)
                     {
-                        try
+                        _ = Task.Run(async () =>
                         {
-                            await SendEventAsync(new MatchZyDemoUploadFailEvent
+                            try
                             {
-                                MatchId = matchId,
-                                MapNumber = mapNumber,
-                                FileName = Path.GetFileName(filePath),
-                                SizeMB = null,
-                                Status = "file_not_found",
-                                Reason = "file_not_found"
-                            });
-                            await SendEventAsync(new MatchZyDemoUploadedEvent
-                            {
-                                MatchId = matchId,
-                                MapNumber = mapNumber,
-                                FileName = Path.GetFileName(filePath),
-                                Success = false
-                            });
-                        }
-                        catch { /* best-effort */ }
-                    });
+                                await SendEventAsync(new MatchZyDemoUploadFailEvent
+                                {
+                                    MatchId = matchId,
+                                    MapNumber = mapNumber,
+                                    FileName = Path.GetFileName(filePath),
+                                    SizeMB = null,
+                                    Status = "file_not_found",
+                                    Reason = "file_not_found"
+                                });
+                                await SendEventAsync(new MatchZyDemoUploadedEvent
+                                {
+                                    MatchId = matchId,
+                                    MapNumber = mapNumber,
+                                    FileName = Path.GetFileName(filePath),
+                                    Success = false
+                                });
+                            }
+                            catch { /* best-effort */ }
+                        });
+                    }
                     return;
                 }
 
@@ -4298,23 +4320,26 @@ namespace MatchZy
                 long fileSizeBytes = fileInfo.Length;
                 double fileSizeMB = fileSizeBytes / 1024.0 / 1024.0;
                 Log($"[UploadFileAsync] File found. Size: {fileSizeMB:F2} MB ({fileSizeBytes} bytes)");
-                Log($"[DEMO_UPLOAD] FILE_OK matchId={matchId} map={mapNumber} sizeMB={fileSizeMB:F2}");
+                Log($"{marker} FILE_OK matchId={matchId} map={mapNumber} sizeMB={fileSizeMB:F2}");
 
                 // Emit upload started (best-effort).
-                _ = Task.Run(async () =>
+                if (isDemo)
                 {
-                    try
+                    _ = Task.Run(async () =>
                     {
-                        await SendEventAsync(new MatchZyDemoUploadStartedEvent
+                        try
                         {
-                            MatchId = matchId,
-                            MapNumber = mapNumber,
-                            FileName = Path.GetFileName(filePath),
-                            SizeMB = fileSizeMB
-                        });
-                    }
-                    catch { /* best-effort */ }
-                });
+                            await SendEventAsync(new MatchZyDemoUploadStartedEvent
+                            {
+                                MatchId = matchId,
+                                MapNumber = mapNumber,
+                                FileName = Path.GetFileName(filePath),
+                                SizeMB = fileSizeMB
+                            });
+                        }
+                        catch { /* best-effort */ }
+                    });
+                }
                 Log($"[UploadFileAsync] Opening file stream for upload...");
                 using FileStream fileStream = File.OpenRead(filePath);
                 using StreamContent content = new(fileStream);
@@ -4377,7 +4402,7 @@ namespace MatchZy
                 {
                     Log($"[UploadFileAsync] ===== Upload FAILED =====");
                     Log($"[UploadFileAsync] No response after retries");
-                    Log($"[DEMO_UPLOAD] FAIL matchId={matchId} map={mapNumber} status=0 reason=\"no_response\" seconds={uploadDuration.TotalSeconds:F2}");
+                    Log($"{marker} FAIL matchId={matchId} map={mapNumber} status=0 reason=\"no_response\" seconds={uploadDuration.TotalSeconds:F2}");
                     return;
                 }
 
@@ -4390,37 +4415,43 @@ namespace MatchZy
                     Log($"[UploadFileAsync] FileSize: {fileSizeMB:F2} MB");
                     Log($"[UploadFileAsync] Response: {SecretRedactor.RedactText(responseBody)}");
                     Log($"[UploadFileAsync] ===========================");
-                    Log($"[DEMO_UPLOAD] SUCCESS matchId={matchId} map={mapNumber} sizeMB={fileSizeMB:F2} seconds={uploadDuration.TotalSeconds:F2} status={(int)response.StatusCode}");
+                    Log($"{marker} SUCCESS matchId={matchId} map={mapNumber} sizeMB={fileSizeMB:F2} seconds={uploadDuration.TotalSeconds:F2} status={(int)response.StatusCode}");
 
                     // Emit success markers (best-effort).
-                    _ = Task.Run(async () =>
+                    if (isDemo)
                     {
-                        try
+                        _ = Task.Run(async () =>
                         {
-                            await SendEventAsync(new MatchZyDemoUploadSuccessEvent
+                            try
                             {
-                                MatchId = matchId,
-                                MapNumber = mapNumber,
-                                FileName = fileName,
-                                SizeMB = fileSizeMB,
-                                Status = ((int)response.StatusCode).ToString()
-                            });
-                            await SendEventAsync(new MatchZyDemoUploadedEvent
-                            {
-                                MatchId = matchId,
-                                MapNumber = mapNumber,
-                                FileName = fileName,
-                                Success = true
-                            });
-                        }
-                        catch { /* best-effort */ }
-                    });
+                                await SendEventAsync(new MatchZyDemoUploadSuccessEvent
+                                {
+                                    MatchId = matchId,
+                                    MapNumber = mapNumber,
+                                    FileName = fileName,
+                                    SizeMB = fileSizeMB,
+                                    Status = ((int)response.StatusCode).ToString()
+                                });
+                                await SendEventAsync(new MatchZyDemoUploadedEvent
+                                {
+                                    MatchId = matchId,
+                                    MapNumber = mapNumber,
+                                    FileName = fileName,
+                                    Success = true
+                                });
+                            }
+                            catch { /* best-effort */ }
+                        });
+                    }
 
                     // Send success message to chat
-                    Server.NextFrame(() =>
+                    if (isDemo)
                     {
-                        PrintToAllChat($"{ChatColors.Green}Demo upload succeeded{ChatColors.Default} ({fileSizeMB:F1} MB)");
-                    });
+                        Server.NextFrame(() =>
+                        {
+                            PrintToAllChat($"{ChatColors.Green}Demo upload succeeded{ChatColors.Default} ({fileSizeMB:F1} MB)");
+                        });
+                    }
                 }
                 else
                 {
@@ -4435,38 +4466,44 @@ namespace MatchZy
                     Log($"[UploadFileAsync] MatchId: {matchId}, MapNumber: {mapNumber}");
                     Log($"[UploadFileAsync] FileName: {fileName}");
                     Log($"[UploadFileAsync] ===========================");
-                    Log($"[DEMO_UPLOAD] FAIL matchId={matchId} map={mapNumber} status={(int)response.StatusCode} reason=\"{errorReason}\" seconds={uploadDuration.TotalSeconds:F2}");
+                    Log($"{marker} FAIL matchId={matchId} map={mapNumber} status={(int)response.StatusCode} reason=\"{errorReason}\" seconds={uploadDuration.TotalSeconds:F2}");
 
                     // Emit failure markers (best-effort).
-                    _ = Task.Run(async () =>
+                    if (isDemo)
                     {
-                        try
+                        _ = Task.Run(async () =>
                         {
-                            await SendEventAsync(new MatchZyDemoUploadFailEvent
+                            try
                             {
-                                MatchId = matchId,
-                                MapNumber = mapNumber,
-                                FileName = fileName,
-                                SizeMB = fileSizeMB,
-                                Status = ((int)response.StatusCode).ToString(),
-                                Reason = errorReason
-                            });
-                            await SendEventAsync(new MatchZyDemoUploadedEvent
-                            {
-                                MatchId = matchId,
-                                MapNumber = mapNumber,
-                                FileName = fileName,
-                                Success = false
-                            });
-                        }
-                        catch { /* best-effort */ }
-                    });
+                                await SendEventAsync(new MatchZyDemoUploadFailEvent
+                                {
+                                    MatchId = matchId,
+                                    MapNumber = mapNumber,
+                                    FileName = fileName,
+                                    SizeMB = fileSizeMB,
+                                    Status = ((int)response.StatusCode).ToString(),
+                                    Reason = errorReason
+                                });
+                                await SendEventAsync(new MatchZyDemoUploadedEvent
+                                {
+                                    MatchId = matchId,
+                                    MapNumber = mapNumber,
+                                    FileName = fileName,
+                                    Success = false
+                                });
+                            }
+                            catch { /* best-effort */ }
+                        });
+                    }
 
                     // Send failure message to chat
-                    Server.NextFrame(() =>
+                    if (isDemo)
                     {
-                        PrintToAllChat($"{ChatColors.Red}Failed to upload demo: {errorReason}{ChatColors.Default}");
-                    });
+                        Server.NextFrame(() =>
+                        {
+                            PrintToAllChat($"{ChatColors.Red}Failed to upload demo: {errorReason}{ChatColors.Default}");
+                        });
+                    }
                 }
             }
             catch (Exception e)
@@ -4485,38 +4522,44 @@ namespace MatchZy
                 }
                 Log($"[UploadFileAsync] Stack trace: {e.StackTrace}");
                 Log($"[UploadFileAsync] ==============================");
-                Log($"[DEMO_UPLOAD] FATAL matchId={matchId} map={mapNumber} error=\"{errorMessage}\"");
+                Log($"{marker} FATAL matchId={matchId} map={mapNumber} error=\"{errorMessage}\"");
 
                 // Emit fatal marker (best-effort).
-                _ = Task.Run(async () =>
+                if (isDemo)
                 {
-                    try
+                    _ = Task.Run(async () =>
                     {
-                        await SendEventAsync(new MatchZyDemoUploadFailEvent
+                        try
                         {
-                            MatchId = matchId,
-                            MapNumber = mapNumber,
-                            FileName = Path.GetFileName(filePath),
-                            SizeMB = null,
-                            Status = "exception",
-                            Reason = errorMessage
-                        });
-                        await SendEventAsync(new MatchZyDemoUploadedEvent
-                        {
-                            MatchId = matchId,
-                            MapNumber = mapNumber,
-                            FileName = Path.GetFileName(filePath),
-                            Success = false
-                        });
-                    }
-                    catch { /* best-effort */ }
-                });
+                            await SendEventAsync(new MatchZyDemoUploadFailEvent
+                            {
+                                MatchId = matchId,
+                                MapNumber = mapNumber,
+                                FileName = Path.GetFileName(filePath),
+                                SizeMB = null,
+                                Status = "exception",
+                                Reason = errorMessage
+                            });
+                            await SendEventAsync(new MatchZyDemoUploadedEvent
+                            {
+                                MatchId = matchId,
+                                MapNumber = mapNumber,
+                                FileName = Path.GetFileName(filePath),
+                                Success = false
+                            });
+                        }
+                        catch { /* best-effort */ }
+                    });
+                }
 
                 // Send error message to chat
-                Server.NextFrame(() =>
+                if (isDemo)
                 {
-                    PrintToAllChat($"{ChatColors.Red}Failed to upload demo: {errorMessage}{ChatColors.Default}");
-                });
+                    Server.NextFrame(() =>
+                    {
+                        PrintToAllChat($"{ChatColors.Red}Failed to upload demo: {errorMessage}{ChatColors.Default}");
+                    });
+                }
             }
         }
 
