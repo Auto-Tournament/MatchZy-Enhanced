@@ -11,6 +11,11 @@ on:
           - patch
           - minor
           - major
+      prerelease:
+        description: "Publish as a pre-release (does not touch \"latest\")"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,4 +48,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PRERELEASE: ${{ github.event.inputs.prerelease }}
         run: echo "y" | bash ./release.sh "${{ github.event.inputs.bump_type }}"
