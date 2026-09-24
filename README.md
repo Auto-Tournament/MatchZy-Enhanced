@@ -14,6 +14,19 @@
 
 </div>
 
+<div align="center">
+
+### Sponsor Auto Tournament
+
+Running tournaments or LANs with Auto Tournament? Your organisation can keep it growing.
+Auto Tournament is built and maintained by one person — sponsorships pay for development, test servers and infrastructure.
+
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/sivert-io)
+[![Support on Ko-fi](https://img.shields.io/badge/Support-Ko--fi-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/sivert)
+[![Become a sponsor](https://img.shields.io/badge/Become%20a%20sponsor-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/n7gHYau7aW)
+
+</div>
+
 Auto Tournament CS2 is the CS2 server plugin for [Auto Tournament](https://github.com/Auto-Tournament/auto-tournament).
 Auto Tournament runs tournaments across a pool of CS2 servers and needs to set up, control and track
 matches from outside the game.
@@ -219,6 +232,10 @@ shared MySQL database.
 
 - [Auto Tournament](https://github.com/Auto-Tournament/auto-tournament): the tournament platform this plugin is built for
 - [CS2 Server Manager](https://github.com/Auto-Tournament/cs2-server-manager): sets up and runs multiple CS2 servers
+
+## Sponsors
+
+Your logo here — [sponsor Auto Tournament](https://discord.gg/n7gHYau7aW) to be listed.
 
 ## Credits
 
