@@ -301,6 +301,17 @@ else
     echo -e "${GREEN}📦 Using current version: ${VERSION}${NC}"
 fi
 
+# This is the 2.x line (dev). 1.x hotfixes are released from hotfix/1.4.x; guard against
+# releasing a 1.x build as 2.x, or releasing from a detached HEAD (nothing to push).
+if [ "${VERSION%%.*}" = "1" ]; then
+    echo -e "${RED}❌ dev only releases 2.x+ versions (got ${VERSION}). 1.x is released from hotfix/1.4.x.${NC}"
+    exit 1
+fi
+if [ -z "$(git branch --show-current 2>/dev/null)" ]; then
+    echo -e "${RED}❌ Not on a branch (detached HEAD). Run the release on a proper branch.${NC}"
+    exit 1
+fi
+
 # Ensure working tree is completely clean before proceeding
 if ! git diff --quiet || ! git diff --cached --quiet; then
     echo -e "${RED}❌ Working tree is not clean. Please commit or stash all changes before running the release script.${NC}"
@@ -329,8 +340,8 @@ preflight_deps
 preflight_auth
 preflight_release_config
 
-# Check if tag already exists (local)
-if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+# Check if tag already exists (local or on origin)
+if git rev-parse "v${VERSION}" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
     echo -e "${RED}❌ Tag v${VERSION} already exists!${NC}"
     echo "Please bump to a new version or delete the existing tag:"
     echo "  git tag -d v${VERSION}"
@@ -392,14 +403,19 @@ mkdir -p "${BUILD_ROOT}"
 )
 
 # The layout csm and operators rely on. Fail before anything is committed or published.
+ZIP_LISTING="$(unzip -Z1 "${BUILD_ROOT}/${RELEASE_DIR}.zip")"
 for required in \
     "addons/counterstrikesharp/plugins/AutoTournamentCS2/AutoTournamentCS2.dll" \
     "cfg/AutoTournamentCS2/config.cfg"; do
-    if ! unzip -l "${BUILD_ROOT}/${RELEASE_DIR}.zip" | awk '{print $4}' | grep -qx "$required"; then
+    if ! grep -qx "$required" <<< "$ZIP_LISTING"; then
         echo -e "${RED}❌ ${RELEASE_DIR}.zip is missing ${required}${NC}"
         exit 1
     fi
 done
+if grep -q "/database.json$" <<< "$ZIP_LISTING"; then
+    echo -e "${RED}❌ ${RELEASE_DIR}.zip must not contain database.json${NC}"
+    exit 1
+fi
 
 # Get file size for display
 SIZE=$(du -h "${BUILD_ROOT}/${RELEASE_DIR}.zip" | cut -f1)
@@ -419,8 +435,9 @@ git commit -m "Release v${VERSION}"
 
 echo -e "\n${BLUE}📝 Generating changelog for GitHub release...${NC}"
 
-# Changelog based on commits between the previous tag (if any) and HEAD
-prev_tag=$(git tag --sort=-v:refname | head -n 1 || echo "")
+# Changelog based on commits between the previous release on this branch (if any) and HEAD.
+# Only tags reachable from HEAD count: a tag from another line (e.g. a 1.x hotfix) is not on this branch.
+prev_tag=$(git tag --merged HEAD --sort=-v:refname | head -n 1 || echo "")
 
 log_range=""
 if [ -n "$prev_tag" ]; then
@@ -467,15 +484,24 @@ EOF
 echo -e "\n${BLUE}⬆️  Pushing release commit to origin...${NC}"
 CURRENT_BRANCH=$(git branch --show-current)
 git push origin "$CURRENT_BRANCH"
+RELEASE_SHA=$(git rev-parse HEAD)
 
 # Create GitHub release (this will also create tag vX.Y.Z on GitHub if it doesn't exist)
 echo -e "\n${BLUE}🌟 Creating GitHub release (and tag v${VERSION})...${NC}"
+# --target: without it GitHub creates the tag on the default branch (dev), not on this commit.
+PRERELEASE="${PRERELEASE:-false}"
+LATEST_OR_PRERELEASE_FLAG="--latest"
+if [ "$PRERELEASE" = "true" ] || [ "$PRERELEASE" = "1" ]; then
+    echo -e "${YELLOW}⚠️  Publishing as a pre-release; \"latest\" will not be touched.${NC}"
+    LATEST_OR_PRERELEASE_FLAG="--prerelease"
+fi
 gh release create "v${VERSION}" \
     "${BUILD_ROOT}/${RELEASE_DIR}.zip" \
+    --target "${RELEASE_SHA}" \
     --title "Auto Tournament CS2 v${VERSION}" \
     --notes "$RELEASE_NOTES" \
     --draft=false \
-    --latest
+    ${LATEST_OR_PRERELEASE_FLAG}
 
 # Send Discord webhook notification (required unless explicitly skipped)
 if [ "${SKIP_DISCORD_WEBHOOK:-}" = "1" ] || [ "${SKIP_DISCORD_WEBHOOK:-}" = "true" ]; then
