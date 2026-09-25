@@ -233,6 +233,12 @@ shared MySQL database.
 - [Auto Tournament](https://github.com/Auto-Tournament/auto-tournament): the tournament platform this plugin is built for
 - [CS2 Server Manager](https://github.com/Auto-Tournament/cs2-server-manager): sets up and runs multiple CS2 servers
 
+## License
+
+MatchZy Enhanced (now named Auto Tournament CS2) is MIT licensed, see [LICENSE](LICENSE) — free for any use, including paid work and commercial servers.
+
+[Ready Up](https://github.com/Auto-Tournament/ready-up), the new native CS2 plugin, is a separate project and is not MIT: it's licensed under PolyForm Noncommercial.
+
 ## Sponsors
 
 Your logo here — [sponsor Auto Tournament](https://discord.gg/n7gHYau7aW) to be listed.
